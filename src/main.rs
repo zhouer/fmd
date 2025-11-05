@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use globset::Glob;
+use ignore::WalkBuilder;
 use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -7,7 +9,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 
 /// fmd — Find Markdown files by metadata
 #[derive(Parser, Debug)]
@@ -361,23 +362,54 @@ fn should_include_file(
 fn enumerate_files(args: &Args) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
-    for dir in &args.dirs {
-        let walker = if let Some(depth) = args.depth {
-            WalkDir::new(dir).max_depth(depth)
-        } else {
-            WalkDir::new(dir)
-        };
+    // Build glob matcher from the glob pattern
+    let glob_matcher = match Glob::new(&args.glob) {
+        Ok(glob) => glob.compile_matcher(),
+        Err(e) => {
+            eprintln!("Warning: Invalid glob pattern '{}': {}", args.glob, e);
+            // Fall back to matching *.md
+            Glob::new("*.md").unwrap().compile_matcher()
+        }
+    };
 
-        for entry in walker.into_iter().filter_map(|e| e.ok()) {
+    for dir in &args.dirs {
+        // Use ignore crate's WalkBuilder for better performance and .gitignore support
+        let mut walker = WalkBuilder::new(dir);
+
+        // Respect .gitignore files
+        walker.git_ignore(true);
+
+        // Respect global gitignore
+        walker.git_global(true);
+
+        // Respect .ignore files
+        walker.ignore(true);
+
+        // Filter hidden files/directories (like .git, .obsidian)
+        walker.hidden(true);
+
+        // Set max depth if specified
+        if let Some(depth) = args.depth {
+            walker.max_depth(Some(depth));
+        }
+
+        for entry in walker.build().filter_map(|e| e.ok()) {
             let path = entry.path();
 
-            // Check if it's a file with .md extension
-            if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    if ext == "md" {
-                        files.push(path.to_path_buf());
-                    }
-                }
+            // Additional filtering for specific directories we always want to skip
+            // (in case they're not hidden or not in .gitignore)
+            let path_str = path.to_string_lossy();
+            if path_str.contains("/target/")
+                || path_str.contains("/node_modules/")
+                || path_str.contains("/.obsidian/") {
+                continue;
+            }
+
+            // Check if it's a file and matches the glob pattern
+            // Match against the full path to support patterns like "**/*.md"
+            // as well as simple filename patterns like "*.md"
+            if path.is_file() && glob_matcher.is_match(path) {
+                files.push(path.to_path_buf());
             }
         }
     }
