@@ -148,9 +148,33 @@ impl CompiledFilters {
                     "Invalid field filter format: '{}'. Expected 'field:pattern'",
                     field_spec
                 ))?;
+
+            let field_trimmed = field.trim();
+            let pattern_trimmed = pattern.trim();
+
+            // Validate that both field and pattern are non-empty
+            if field_trimmed.is_empty() && pattern_trimmed.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Both field and pattern cannot be empty in filter '{}'",
+                    field_spec
+                ));
+            }
+            if field_trimmed.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Field name cannot be empty in filter '{}'",
+                    field_spec
+                ));
+            }
+            if pattern_trimmed.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Pattern cannot be empty in filter '{}'",
+                    field_spec
+                ));
+            }
+
             field_patterns.push((
-                field.trim().to_string(),
-                pattern.trim().to_lowercase()
+                field_trimmed.to_string(),
+                pattern_trimmed.to_lowercase()
             ));
         }
 
@@ -223,12 +247,12 @@ struct Metadata {
 }
 
 impl Metadata {
-    fn from_file(path: &Path, head_lines: usize, full_text: bool, verbose: bool) -> Result<Self> {
+    fn from_file(path: &Path, head_lines: usize, full_text: bool, _verbose: bool) -> Result<Self> {
         // Read file content efficiently (only what we need)
         let content = read_file_content(path, head_lines, full_text)?;
 
         // Try to extract YAML frontmatter
-        let frontmatter = extract_frontmatter(&content, path, verbose);
+        let frontmatter = extract_frontmatter(&content, path);
 
         // The content we read is already optimized for the mode
         Ok(Metadata {
@@ -373,7 +397,8 @@ fn read_file_content(path: &Path, head_lines: usize, full_text: bool) -> Result<
 ///
 /// Frontmatter must be delimited by `---` at the start and end.
 /// Returns `None` if no valid frontmatter is found or if YAML parsing fails.
-fn extract_frontmatter(content: &str, path: &Path, verbose: bool) -> Option<Frontmatter> {
+/// YAML parsing errors are always logged to stderr as they affect search accuracy.
+fn extract_frontmatter(content: &str, path: &Path) -> Option<Frontmatter> {
     let mut lines = content.lines();
 
     // Check if first line is "---"
@@ -398,9 +423,7 @@ fn extract_frontmatter(content: &str, path: &Path, verbose: bool) -> Option<Fron
     match serde_yaml::from_str(&yaml_content) {
         Ok(fm) => Some(fm),
         Err(e) => {
-            if verbose {
-                eprintln!("Warning: Failed to parse YAML frontmatter in {}: {}", path.display(), e);
-            }
+            eprintln!("Warning: Failed to parse YAML frontmatter in {}: {}", path.display(), e);
             None
         }
     }
@@ -611,7 +634,7 @@ mod tests {
     fn test_extract_frontmatter_valid() {
         let content = "---\ntitle: Test\ntags: [rust, cli]\n---\n# Content";
         let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path, false);
+        let fm = extract_frontmatter(content, &path);
 
         assert!(fm.is_some());
         let fm = fm.unwrap();
@@ -622,7 +645,7 @@ mod tests {
     fn test_extract_frontmatter_empty() {
         let content = "---\n---\n# Content";
         let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path, false);
+        let fm = extract_frontmatter(content, &path);
 
         assert!(fm.is_none());
     }
@@ -631,7 +654,7 @@ mod tests {
     fn test_extract_frontmatter_none() {
         let content = "# Just a heading";
         let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path, false);
+        let fm = extract_frontmatter(content, &path);
 
         assert!(fm.is_none());
     }
@@ -640,7 +663,7 @@ mod tests {
     fn test_extract_frontmatter_multiline_tags() {
         let content = "---\ntags:\n  - rust\n  - cli\n---\n# Content";
         let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path, false);
+        let fm = extract_frontmatter(content, &path);
 
         assert!(fm.is_some());
         let fm = fm.unwrap();
@@ -716,10 +739,106 @@ mod tests {
     }
 
     #[test]
+    fn test_compiled_filters_empty_field_name() {
+        let args = Args {
+            tags: vec![],
+            titles: vec![],
+            names: vec![],
+            fields: vec![":pattern".to_string()], // Empty field name
+            nul: false,
+            ignore_case: false,
+            depth: None,
+            glob: "**/*.md".to_string(),
+            head_lines: 10,
+            full_text: false,
+            verbose: false,
+            dirs: vec![PathBuf::from(".")],
+        };
+
+        let result = CompiledFilters::from_args(&args);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("Field name cannot be empty"));
+        }
+    }
+
+    #[test]
+    fn test_compiled_filters_empty_pattern() {
+        let args = Args {
+            tags: vec![],
+            titles: vec![],
+            names: vec![],
+            fields: vec!["field:".to_string()], // Empty pattern
+            nul: false,
+            ignore_case: false,
+            depth: None,
+            glob: "**/*.md".to_string(),
+            head_lines: 10,
+            full_text: false,
+            verbose: false,
+            dirs: vec![PathBuf::from(".")],
+        };
+
+        let result = CompiledFilters::from_args(&args);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("Pattern cannot be empty"));
+        }
+    }
+
+    #[test]
+    fn test_compiled_filters_empty_field_and_pattern() {
+        let args = Args {
+            tags: vec![],
+            titles: vec![],
+            names: vec![],
+            fields: vec![":".to_string()], // Both empty
+            nul: false,
+            ignore_case: false,
+            depth: None,
+            glob: "**/*.md".to_string(),
+            head_lines: 10,
+            full_text: false,
+            verbose: false,
+            dirs: vec![PathBuf::from(".")],
+        };
+
+        let result = CompiledFilters::from_args(&args);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("Both field and pattern cannot be empty"));
+        }
+    }
+
+    #[test]
+    fn test_compiled_filters_whitespace_only_field() {
+        let args = Args {
+            tags: vec![],
+            titles: vec![],
+            names: vec![],
+            fields: vec!["  :pattern".to_string()], // Whitespace-only field
+            nul: false,
+            ignore_case: false,
+            depth: None,
+            glob: "**/*.md".to_string(),
+            head_lines: 10,
+            full_text: false,
+            verbose: false,
+            dirs: vec![PathBuf::from(".")],
+        };
+
+        let result = CompiledFilters::from_args(&args);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("Field name cannot be empty"));
+        }
+    }
+
+    #[test]
     fn test_metadata_has_tag_yaml() {
         let content = "---\ntags: [rust, cli]\n---\n# Content";
         let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path, false);
+        let fm = extract_frontmatter(content, &path);
         let metadata = Metadata {
             frontmatter: fm,
             raw_content: content.to_string(),
@@ -755,7 +874,7 @@ mod tests {
     fn test_metadata_has_title_yaml() {
         let content = "---\ntitle: Meeting Notes\n---\n# Content";
         let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path, false);
+        let fm = extract_frontmatter(content, &path);
         let metadata = Metadata {
             frontmatter: fm,
             raw_content: content.to_string(),
@@ -782,7 +901,7 @@ mod tests {
     fn test_metadata_has_field() {
         let content = "---\nauthor: John Doe\nstatus: draft\n---\n# Content";
         let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path, false);
+        let fm = extract_frontmatter(content, &path);
         let metadata = Metadata {
             frontmatter: fm,
             raw_content: content.to_string(),
