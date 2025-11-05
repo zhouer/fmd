@@ -11,66 +11,13 @@ This document outlines planned features and improvements for fmd.
 
 ---
 
-## ✅ Completed Features (v0.1.0)
-
-### Full-Text Search ⭐⭐⭐⭐
-**Status**: ✅ Completed (v0.1.0)
-**Impact**: High - Essential for finding tags anywhere in files
-
-#### Implementation
-- Added `--full-text` flag to scan entire file content
-- By default, only scans first 10 lines (controlled by `--head`)
-- Works with all filter types (-t, -T, -f, -n)
-
-#### Usage
-```bash
-# Default: fast, scans first 10 lines only
-fmd -t ProjectTag
-
-# Full-text: slower, scans entire file
-fmd -t ProjectTag --full-text
-```
-
----
-
 ## 🔧 Near-Term Fixes (v0.1.x Maintenance)
 
 These are low-risk, high-impact improvements planned for the next v0.1.x patch release before v0.2.0.
 
-### 1. Unify Walking, Globs, and Ignores ⭐⭐⭐⭐
-**Status**: Planned  
-**Impact**: High — Makes `--glob` effective and skips noisy dirs  
-**Complexity**: Medium
-
-#### Implementation Notes
-- Replace custom `walkdir` traversal with `ignore` crate to get fast recursive walking, `.gitignore`/global ignores, and efficient file enumeration.
-- Implement `--glob` using `ignore::overrides` or `globset` so patterns like `**/*.md`, `notes/**/*.md`, or multiple `--glob` can be honored.
-- Default ignore directories: `.git`, `target`, `node_modules`, `.obsidian` (and respect user `.gitignore`).
-
-#### CLI Notes
-- Keep existing `--glob GLOB` flag. Optionally allow multiple occurrences (e.g., `--glob "**/*.md" --glob "**/*.mdx"`). Backward compatible.
-
-#### Estimated Effort
-~120–180 LOC, 2–4 hours
-
----
-
-### 2. Case-Insensitive Regex Correctness ⭐⭐⭐⭐
-**Status**: Planned  
-**Impact**: Medium-High — Correctness for `-n/--name` with regex  
-**Complexity**: Low
-
-#### Implementation Notes
-- Replace “to_lowercase + Regex::new” approach with `regex::RegexBuilder` and `case_insensitive(true)` when `-i/--ignore-case` is set, avoiding semantic changes to user-provided patterns.
-
-#### Estimated Effort
-~20–40 LOC, <1 hour
-
----
-
-### 3. Title and Inline Tags Scanning Robustness ⭐⭐⭐⭐
-**Status**: Planned  
-**Impact**: Medium-High — Fewer misses in common note styles  
+### 1. Title and Inline Tags Scanning Robustness ⭐⭐⭐⭐
+**Status**: TBD
+**Impact**: Medium-High — Fewer misses in common note styles
 **Complexity**: Low-Medium
 
 #### Implementation Notes
@@ -85,24 +32,10 @@ These are low-risk, high-impact improvements planned for the next v0.1.x patch r
 
 ---
 
-### 4. Basic Tests and Fixtures ⭐⭐⭐⭐
-**Status**: Planned  
-**Impact**: High — Prevent regressions while v0.2.0 evolves  
-**Complexity**: Low-Medium
-
-#### Implementation Notes
-- Add `tests/fixtures/` with samples: YAML frontmatter (single/array/multi-line), inline fields, multiple heading levels, filenames for regex/i-case edge cases, ignored directories.
-- Write integration tests covering filter logic: same-type OR, cross-type AND, `--head` vs `--full-text`, `--glob`, and `.gitignore` handling.
-
-#### Estimated Effort
-~4–6 tests, 2–3 hours
-
----
-
 ## 🎯 Top Priority Features (Next Release - v0.2.0)
 
 ### 1. Date Filtering ⭐⭐⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: High - Essential for note management
 **Complexity**: Medium
 
@@ -136,7 +69,7 @@ fmd --modified-within "7 days"
 ---
 
 ### 2. Sorting Options ⭐⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: High - Improves usability
 **Complexity**: Low
 
@@ -165,7 +98,7 @@ fmd -t Work --sort date --reverse
 ---
 
 ### 3. Output Format Options ⭐⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Medium - Better integration with other tools
 **Complexity**: Medium
 
@@ -217,7 +150,7 @@ notes/report.md         Q4 Report        finance,work 2025-11-03
 ---
 
 ### 4. Statistics and Aggregation ⭐⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Medium - Provides insights
 **Complexity**: Medium
 
@@ -266,7 +199,7 @@ Date Range: 2025-01-15 to 2025-11-04 (294 days)
 ---
 
 ### 5. Cache Mechanism ⭐⭐⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Very High - Major performance boost
 **Complexity**: High
 
@@ -315,7 +248,7 @@ fmd --cache-info
 ## 📋 Secondary Features
 
 ### 6. Interactive Mode ⭐⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Medium
 **Complexity**: Medium-High
 
@@ -344,7 +277,7 @@ fmd --fzf --preview
 ---
 
 ### 7. Content Search ⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Medium
 **Complexity**: Medium
 
@@ -372,7 +305,7 @@ fmd --content "Docker" --show-context 3
 ---
 
 ### 8. Exclusion Filters (NOT logic) ⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Medium
 **Complexity**: Low
 
@@ -399,7 +332,7 @@ fmd --exclude-dir ".git" --exclude-dir "archive"
 ---
 
 ### 9. Saved Queries / Aliases ⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Medium
 **Complexity**: Medium
 
@@ -433,7 +366,7 @@ fmd --delete-query work-todos
 ---
 
 ### 10. Configuration File ⭐⭐⭐
-**Status**: Planned
+**Status**: TBD
 **Impact**: Medium
 **Complexity**: Low
 
@@ -622,8 +555,6 @@ Would require AI/ML integration or complex NLP parsing.
 
 ### Phase 0: v0.1.x Maintenance
 **Target**: 1–3 days
-- [ ] Unify walking, globs, and ignores (ignore crate + `--glob`)
-- [ ] Case-insensitive regex correctness (`RegexBuilder`)
 - [ ] Title and inline tags scanning robustness
 - [ ] Basic tests and fixtures
 
