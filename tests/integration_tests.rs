@@ -228,10 +228,14 @@ fn test_multiline_yaml_tags() {
 fn test_full_text_search() {
     let temp_dir = TempDir::new().unwrap();
 
-    // Create a file with tag deep in content (beyond default 10 lines)
+    // DEFAULT_HEAD_LINES is 10 in main.rs
+    const DEFAULT_HEAD_LINES: usize = 10;
+
+    // Create a file with tag deep in content (beyond default head lines)
     let mut deep_content = String::new();
     deep_content.push_str("# Title\n\n");
-    for i in 1..=15 {
+    // Generate lines beyond DEFAULT_HEAD_LINES to ensure tag is not in scanned content
+    for i in 1..=(DEFAULT_HEAD_LINES + 5) {
         deep_content.push_str(&format!("Line {} of content.\n", i));
     }
     deep_content.push_str("And here we mention #important");
