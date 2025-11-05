@@ -10,6 +10,11 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
+/// Default number of lines to scan for metadata when not in full-text mode.
+/// This is enough to capture typical frontmatter (usually < 10 lines) plus
+/// a few lines of content for inline metadata detection.
+const DEFAULT_HEAD_LINES: usize = 10;
+
 /// fmd — Find Markdown files by metadata
 #[derive(Parser, Debug)]
 #[command(name = "fmd")]
@@ -48,7 +53,7 @@ struct Args {
     glob: String,
 
     /// Lines to scan for metadata
-    #[arg(long = "head", default_value = "10")]
+    #[arg(long = "head", default_value_t = DEFAULT_HEAD_LINES)]
     head_lines: usize,
 
     /// Search full file content (not just first N lines)
@@ -252,24 +257,34 @@ impl Metadata {
         // Check YAML frontmatter
         if let Some(ref fm) = self.frontmatter {
             if let Some(value) = fm.extra.get(field_name) {
-                let value_str = match value {
-                    serde_yaml::Value::String(s) => s.clone(),
-                    serde_yaml::Value::Number(n) => n.to_string(),
-                    serde_yaml::Value::Bool(b) => b.to_string(),
+                match value {
+                    serde_yaml::Value::String(s) => {
+                        if s.to_lowercase().contains(pattern_lower) {
+                            return true;
+                        }
+                    }
+                    serde_yaml::Value::Number(n) => {
+                        if n.to_string().to_lowercase().contains(pattern_lower) {
+                            return true;
+                        }
+                    }
+                    serde_yaml::Value::Bool(b) => {
+                        if b.to_string().to_lowercase().contains(pattern_lower) {
+                            return true;
+                        }
+                    }
                     serde_yaml::Value::Sequence(seq) => {
-                        return seq.iter().any(|v| {
+                        if seq.iter().any(|v| {
                             if let serde_yaml::Value::String(s) = v {
                                 s.to_lowercase().contains(pattern_lower)
                             } else {
                                 false
                             }
-                        });
+                        }) {
+                            return true;
+                        }
                     }
-                    _ => return false,
-                };
-
-                if value_str.to_lowercase().contains(pattern_lower) {
-                    return true;
+                    _ => {}
                 }
             }
         }
@@ -369,21 +384,10 @@ fn matches_filename(path: &Path, regex: &Regex) -> bool {
     regex.is_match(filename)
 }
 
-fn should_include_file(
-    path: &Path,
+fn should_include_file_by_content(
     metadata: &Metadata,
     filters: &CompiledFilters,
 ) -> bool {
-    // Check filename filters (fast, no file I/O)
-    if !filters.name_patterns.is_empty() {
-        let name_matched = filters.name_patterns.iter().any(|regex| {
-            matches_filename(path, regex)
-        });
-        if !name_matched {
-            return false;
-        }
-    }
-
     // Check tag filters
     if !filters.tag_patterns.is_empty() {
         let tag_matched = filters.tag_patterns.iter().any(|(pattern, regex)| {
@@ -427,18 +431,13 @@ fn output_files(files: &[PathBuf], use_nul: bool) {
     }
 }
 
-fn enumerate_files(args: &Args) -> Vec<PathBuf> {
+fn enumerate_files(args: &Args) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
     // Build glob matcher from the glob pattern
-    let glob_matcher = match Glob::new(&args.glob) {
-        Ok(glob) => glob.compile_matcher(),
-        Err(e) => {
-            eprintln!("Warning: Invalid glob pattern '{}': {}", args.glob, e);
-            // Fall back to matching *.md
-            Glob::new("*.md").unwrap().compile_matcher()
-        }
-    };
+    let glob_matcher = Glob::new(&args.glob)
+        .with_context(|| format!("Invalid glob pattern: {}", args.glob))?
+        .compile_matcher();
 
     for dir in &args.dirs {
         // Use ignore crate's WalkBuilder for better performance and .gitignore support
@@ -491,14 +490,14 @@ fn enumerate_files(args: &Args) -> Vec<PathBuf> {
         }
     }
 
-    files
+    Ok(files)
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
     // Enumerate all markdown files
-    let mut files = enumerate_files(&args);
+    let mut files = enumerate_files(&args)?;
 
     // If no filters, just output all files
     if args.tags.is_empty()
@@ -515,15 +514,24 @@ fn main() -> Result<()> {
     // Compile filters once before parallel processing
     let filters = CompiledFilters::from_args(&args)?;
 
-    // Filter files in parallel
+    // Early filtering: check filename patterns first (no I/O required)
+    if !filters.name_patterns.is_empty() {
+        files.retain(|path| {
+            filters.name_patterns.iter().any(|regex| {
+                matches_filename(path, regex)
+            })
+        });
+    }
+
+    // Filter files in parallel (only for content-based filters)
     let mut matching_files: Vec<PathBuf> = files
         .par_iter()
         .filter_map(|path| {
-            // Extract metadata
+            // Extract metadata (only if we need to check content-based filters)
             let metadata = Metadata::from_file(path, args.head_lines, args.full_text).ok()?;
 
-            // Check filters
-            if should_include_file(path, &metadata, &filters) {
+            // Check content-based filters
+            if should_include_file_by_content(&metadata, &filters) {
                 Some(path.clone())
             } else {
                 None
