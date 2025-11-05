@@ -1,176 +1,208 @@
-# mdq — Markdown Query Tool
+# fmd — Find Markdown files by metadata
 
-**`find` for Markdown files with metadata awareness.**
+**A command-line tool that understands your notes.**
 
-A Unix-style command-line tool for querying Markdown/Obsidian notes by tags, title, and filename. Outputs filenames to stdout, perfect for piping to `xargs`, `grep`, `fzf`, and other Unix tools.
+Search Markdown files by tags, frontmatter, and custom fields. Built for note-takers who organize with metadata.
+
+```bash
+fmd --tag python              # Find all notes tagged with python
+fmd --title "meeting"         # Find notes with "meeting" in title
+fmd --tag work --tag urgent   # Find notes with work OR urgent tags
+fmd --field "author:John"     # Find notes by John
+```
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Bash](https://img.shields.io/badge/bash-4.0%2B-green.svg)](https://www.gnu.org/software/bash/)
+[![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg)](https://www.rust-lang.org/)
 
 ---
 
 ## Features
 
-- **🗂 Metadata-aware** — Understands Obsidian-style metadata (`tags:`, `# heading`)
-- **📝 Full YAML frontmatter support** — Query any frontmatter field (author, date, status, etc.)
-- **🔍 Flexible filtering** — Filter by tag, title, filename, or custom fields with regex support
-- **🧩 Composable** — Pipe output to `xargs`, `grep`, `fzf`, and other Unix tools
-- **🛡 Safe & predictable** — Only lists files, never modifies them
-- **🪶 Zero dependencies** — Pure Bash, portable across Linux & macOS
-
----
-
-## Installation
-
-
-```bash
-# Download and install
-curl -o mdq https://raw.githubusercontent.com/yourname/mdq/main/mdq
-chmod +x mdq
-sudo mv mdq /usr/local/bin/
-
-# Verify installation
-mdq --help
-```
-
-**Requirements:** Bash 4.0+, standard Unix utilities (`find`, `awk`, `grep`)
+- **🗂 Metadata-aware** — Understands YAML frontmatter and inline `#tags`
+- **🔍 Flexible filtering** — By tag, title, filename, or any custom field
+- **🧩 Unix-friendly** — Compose with `xargs`, `grep`, `fzf`
+- **🎯 Zero-config** — No database, no indexing required
+- **⚡ Fast** — Parallel processing with Rust
 
 ---
 
 ## Quick Start
 
+### Installation
+
 ```bash
-# List all Markdown files recursively
-mdq
+# From source (requires Rust)
+cargo install --path .
 
-# Find files with specific tags
-mdq -t Linux -t macOS
+# Or use the install script
+./install-rust.sh
+```
 
-# Find files by author
-mdq -f "author:John"
+### Basic Usage
 
-# Combine filters: tag=Work AND status=draft
-mdq -t Work -f "status:draft"
+```bash
+# List all Markdown files
+fmd
 
-# Pipe to other tools
-mdq -t Finance | xargs grep -l "Apple"
+# Find by tag
+fmd --tag python
+fmd -t linux -t macos        # OR logic: linux OR macos
+
+# Find by title (YAML frontmatter or # heading)
+fmd --title "meeting notes"
+fmd -T "project.*2025"       # Regex supported
+
+# Find by filename
+fmd --name "2025-01"         # Files with "2025-01" in name
+fmd -i -n readme             # Case-insensitive
+
+# Find by custom field
+fmd --field "author:John"
+fmd -f "status:draft"
+
+# Combine filters (AND logic across types)
+fmd -t work -T "meeting" -f "author:John"
+# → (tag=work) AND (title=meeting) AND (author=John)
+
+# Search entire file content (not just first 10 lines)
+fmd -t project --full-text
 ```
 
 ---
 
-## Usage
+## Metadata Format Support
 
-### Metadata Format Support
+fmd understands **two metadata formats**:
 
-`mdq` supports **two metadata formats**:
+### 1. YAML Frontmatter
 
-**Simple inline format:**
-```markdown
-# My Document Title
-tags: #Linux #macOS #CLI
-```
-
-**YAML frontmatter format:**
 ```markdown
 ---
-title: My Document Title
-tags: [Linux, macOS, CLI]
+title: My Note
+tags: [python, rust, cli]
 author: John Doe
-date: 2025-11-04
+date: 2025-01-15
 status: draft
-category: Technology
 ---
+
+# Content starts here
 ```
 
-Or YAML array format:
+**Multi-line format:**
 ```markdown
 ---
 title: Setup Guide
 tags:
-  - Linux
-  - Server
-  - Tutorial
-author: Jane Smith
+  - linux
+  - server
+  - tutorial
+date: 2025-01-15
 ---
 ```
 
-### List Markdown files
+### 2. Inline Format
 
-```bash
-mdq                           # list all *.md recursively from current directory
-mdq ./notes                   # list recursively from specific directory
-mdq -d 1                      # list only current directory (non-recursive)
-mdq -d 1 ./notes              # list only in ./notes directory (non-recursive)
+```markdown
+# My Document
+
+tags: #python #rust #cli
+author: John Doe
 ```
 
-### Filter by tags
+**Note:** By default, fmd scans the first 10 lines for inline metadata. Use `--full-text` to search the entire file.
+
+---
+
+## Usage Examples
+
+### Search by Tags
 
 ```bash
-mdq -t Linux                  # files tagged #Linux (recursive)
-mdq -t Finance -t Apple       # files with tag #Finance OR #Apple (OR logic)
-mdq -d 1 -t Linux             # search only current directory for #Linux tagged files
-mdq -t Linux ./notes          # search recursively from ./notes for #Linux files
+# Single tag
+fmd -t python
+
+# Multiple tags (OR logic)
+fmd -t python -t rust        # python OR rust
+
+# Full-text tag search (searches #tag in entire file)
+fmd -t project --full-text
 ```
 
-### Filter by title (markdown heading or YAML title)
+### Search by Title
 
 ```bash
-mdq -T "Meeting"              # files with "Meeting" in title (YAML or # heading)
-mdq -T "Notes.*2025"          # supports regex patterns
-mdq -d 2 -T "Project"         # search up to 2 levels deep by title
+# Find notes with "meeting" in title
+fmd -T meeting
+
+# Regex patterns supported
+fmd -T "notes.*2025"
 ```
 
-### Filter by filename
+### Search by Filename
 
 ```bash
-mdq -n "2025"                 # matches files like "2025-01-15 Meeting.md" (case-sensitive)
-mdq -n "^2025-11"             # files starting with "2025-11"
-mdq -i -n "readme"            # case-insensitive: matches README.md, readme.md, ReadMe.md
-mdq -d 1 -n "\.draft\.md$"    # all draft files in current directory only
+# Case-sensitive by default
+fmd -n "2025-01"
+
+# Case-insensitive
+fmd -i -n readme
 ```
 
-### Filter by custom frontmatter fields
+### Search by Custom Fields
 
 ```bash
-mdq -f "author:John"          # files where author contains "John"
-mdq -f "status:draft"         # files with status = "draft"
-mdq -f "date:2025-11"         # files with date containing "2025-11"
-mdq -f "category:Tech"        # files in Technology category
+# By author
+fmd -f "author:John"
+
+# By status
+fmd -f "status:draft"
+
+# By date
+fmd -f "date:2025-01"
 ```
 
-### Combine filters (AND logic across types)
+### Combine Filters
+
+Filters of **different types** use **AND** logic:
 
 ```bash
-mdq -t Linux -T "Setup"                      # tag=#Linux AND title="Setup"
-mdq -t Work -n "2025"                        # tag=Work AND filename contains "2025"
-mdq -t Work -t Personal -T "2025"            # (tag=Work OR tag=Personal) AND title="2025"
-mdq -f "author:John" -f "author:Jane"        # author=John OR author=Jane
-mdq -t Linux -f "status:draft"               # tag=Linux AND status=draft
-mdq -t Finance -T "Report" -f "date:2025"    # tag=Finance AND title=Report AND date=2025
+# Tag AND title
+fmd -t work -T meeting
+
+# Tag AND author AND status
+fmd -t project -f "author:John" -f "status:active"
 ```
 
-### Pipe to Unix Tools
+Filters of the **same type** use **OR** logic:
 
-`mdq` follows the Unix philosophy of composability:
+```bash
+# tag=python OR tag=rust
+fmd -t python -t rust
+
+# author=John OR author=Jane
+fmd -f "author:John" -f "author:Jane"
+```
+
+### Compose with Unix Tools
 
 ```bash
 # Search file contents
-mdq -t Finance | xargs grep -l 'Apple'
+fmd -t finance | xargs grep -l "Apple"
 
-# Move files
-mdq -d 1 -t Linux | xargs -I {} mv {} ./topics/Linux/
+# Edit all drafts
+fmd -f "status:draft" | xargs $EDITOR
 
 # Count files
-mdq -t TODO | wc -l
+fmd -t todo | wc -l
 
 # Interactive selection with fzf
-mdq | fzf --preview 'bat {}' | xargs $EDITOR
+fmd | fzf --preview 'bat {}' | xargs $EDITOR
+
+# Move files (safe with spaces)
+fmd -0 -t linux | xargs -0 -I {} mv {} ./topics/linux/
 
 # Create archive
-mdq -t Archive | xargs tar -czf archive.tar.gz
-
-# Safe handling of filenames with spaces
-mdq -0 -t Linux | xargs -0 -I {} mv {} ./topics/Linux/
+fmd -t archive | xargs tar -czf archive.tar.gz
 ```
 
 ---
@@ -179,136 +211,129 @@ mdq -0 -t Linux | xargs -0 -I {} mv {} ./topics/Linux/
 
 | Option | Description |
 |--------|-------------|
-| `-0` | Use NUL-delimited output (safe for filenames with spaces) |
-| `-i, --ignore-case` | Case-insensitive filename matching (tags/title/fields already case-insensitive) |
-| `-d, --depth N` | Limit search depth (1=current dir only, default: recursive) |
-| `-t, --tag TAG` | Filter by tag (searches `tags:` metadata, case-insensitive) |
-| `-T, --title PAT` | Filter by title (searches YAML `title:` or `# heading`, case-insensitive) |
-| `-n, --name PAT` | Filter by filename (regex pattern, case-sensitive by default, use `-i` for case-insensitive) |
-| `-f, --field F:P` | Filter by frontmatter field (format: `field:pattern`, case-insensitive) |
+| `-0` | NUL-delimited output (safe for filenames with spaces) |
+| `-i, --ignore-case` | Case-insensitive filename matching |
+| `-d, --depth N` | Limit search depth (1=current dir only) |
+| `-t, --tag TAG` | Filter by tag (case-insensitive) |
+| `-T, --title PAT` | Filter by title (case-insensitive, regex) |
+| `-n, --name PAT` | Filter by filename (regex) |
+| `-f, --field F:P` | Filter by frontmatter field (format: `field:pattern`) |
 | `--glob GLOB` | File pattern to match (default: `*.md`) |
 | `--head N` | Lines to scan for metadata (default: 10) |
+| `--full-text` | Search entire file content |
 | `-h, --help` | Show help message |
 
 ---
 
 ## Filter Logic
 
-`mdq` uses intuitive filter logic:
+### Same Type → OR
 
-### Same Type: OR Logic
-Multiple filters of the same type are combined with **OR**:
-- `-t A -t B` → tag A **OR** tag B
-- `-f author:John -f author:Jane` → author John **OR** Jane
-
-### Cross Type: AND Logic
-Filters of different types are combined with **AND**:
-- `-t A -T X` → tag A **AND** title X
-- `-t A -f status:draft` → tag A **AND** status=draft
-
-### Complex Combinations
 ```bash
-# (tag=Work OR tag=Personal) AND title=Meeting AND author=John
-mdq -t Work -t Personal -T "Meeting" -f "author:John"
+fmd -t A -t B              # A OR B
+fmd -f author:X -f author:Y # X OR Y
+```
+
+### Different Types → AND
+
+```bash
+fmd -t A -T B              # A AND B
+fmd -t A -f status:draft   # A AND draft
+```
+
+### Complex Example
+
+```bash
+# (tag=work OR tag=personal) AND title=meeting AND author=John
+fmd -t work -t personal -T meeting -f "author:John"
 ```
 
 ---
 
-## Design Philosophy
+## Full-Text Search
 
-> **"`find` for Markdown — metadata is the new filesystem."**
+By default, fmd scans only the **first 10 lines** for inline tags (controlled by `--head`). Use `--full-text` to search the entire file:
 
-Traditional `find` filters by filename, path, or mtime. `mdq` extends this paradigm to **Markdown metadata** — enabling queries by tag, title, author, and custom frontmatter fields without requiring a database.
+```bash
+fmd -t project                 # YAML + inline tags in first 10 lines
+fmd -t project --full-text     # Anywhere in content
+```
 
-### Design Principles
-
-1. **Do one thing well** — Only list files, never modify them
-2. **Composable** — Output filenames for other tools to process
-3. **Predictable** — Behave like `find` (recursive by default)
-4. **Metadata-aware** — Understand Obsidian-style tags and YAML frontmatter
-5. **Flexible** — Support depth control, custom fields, and regex patterns
-6. **Portable** — Pure Bash with no external dependencies
+| Mode | YAML `tags:` | Inline `tags:` | Content `#tag` |
+|------|--------------|----------------|----------------|
+| Default | ✓ | ✓ (first 10 lines) | ✗ |
+| `--full-text` | ✓ | ✓ (entire file) | ✓ |
 
 ---
 
 ## Advanced Examples
 
 ```bash
-# Find notes tagged #Finance mentioning Apple (recursive)
-mdq -t Finance | xargs grep -l 'Apple'
+# Find finance notes mentioning Apple
+fmd -t finance | xargs grep -l "Apple"
 
-# Move all Linux-tagged notes from current directory only
-mdq -d 1 -t Linux | xargs -I {} mv {} ./topics/Linux/
+# Move all linux notes from current directory
+fmd -d 1 -t linux | xargs -I {} mv {} ./topics/linux/
 
-# Count all TODO files recursively
-mdq -t TODO | wc -l
+# Edit all draft files
+fmd -f "status:draft" | xargs $EDITOR
 
-# Filter by title pattern (YAML title or heading inside file)
-mdq -T "Meeting Notes" | xargs -I {} mv {} ./meetings/
+# Backup November files
+fmd -f "date:2025-11" | xargs -I {} cp {} ./backup/
 
-# Filter by filename pattern
-mdq -n "2025-11" | xargs -I {} mv {} ./archive/november/
+# Find beginner tutorials
+fmd -f "category:tutorial" -f "difficulty:beginner"
 
-# Filter by custom frontmatter fields
-mdq -f "author:John" | wc -l                    # count John's notes
-mdq -f "status:draft" | xargs $EDITOR           # edit all draft files
-mdq -f "date:2025-11" | xargs -I {} cp {} ./backup/  # backup November files
+# Linux guides updated in 2025
+fmd -t linux -f "updated:2025" -T "guide"
 
-# Combine tag and title filters (AND logic across types)
-mdq -t Important -T "Urgent"        # tag=Important AND title=Urgent
+# Interactive selection
+fmd -t project | fzf --preview 'bat --color=always {}' | xargs $EDITOR
 
-# Combine tag and filename filters
-mdq -t Finance -n "2025"            # tag=Finance AND filename contains "2025"
-
-# Combine tag and frontmatter filters
-mdq -t Project -f "status:active"   # tag=Project AND status=active
-mdq -f "author:John" -f "status:published"  # (author=John OR status=published)
-
-# Multiple filters: OR within type, AND across types
-mdq -t Finance -t Tech -T "2025.*Report"  # (tag=Finance OR tag=Tech) AND title="2025.*Report"
-mdq -t Work -f "author:John" -f "author:Jane" -T "Meeting"  # tag=Work AND (author=John OR Jane) AND title=Meeting
-
-# Interactive file selection with fzf
-mdq | fzf --preview 'bat {}' | xargs $EDITOR
-
-# Work safely with null-delimited filenames (handles spaces)
-mdq -0 -t Linux | xargs -0 -I {} mv {} ./topics/Linux/
-
-# Combine with other find-like patterns
-mdq -n "draft" | xargs rm -i                      # delete draft files (with confirmation)
-mdq -t Archive | xargs tar -czf archive.tar.gz    # create tarball
-
-# Case-insensitive filename matching
-mdq -i -n "readme"                  # matches README.md, readme.md, ReadMe.md
-mdq -i -n "todo" -t urgent          # case-insensitive filename with tag filter
-
-# Limit search depth
-mdq -d 2 -t Project                 # search only 2 levels deep
-mdq -d 1 | wc -l                    # count files in current directory only
-
-# Advanced YAML frontmatter queries
-mdq -f "category:Tutorial" -f "difficulty:beginner"  # beginner tutorials OR easy difficulty
-mdq -t Linux -f "updated:2025" -T "Guide"            # Linux guides updated in 2025
+# Safe handling of filenames with spaces
+fmd -0 -t important | xargs -0 ls -lh
 ```
 
 ---
 
-## Roadmap
+## Building from Source
 
-- [ ] Date-based filtering with comparison operators (`--date-after`, `--date-before`)
-- [ ] Shell completion (zsh, fish, bash)
-- [ ] Performance: optional metadata cache
-- [ ] Support for nested YAML structures
-- [ ] Boolean operators in filter expressions
+### Requirements
+
+- Rust 1.91 or later (install from [rustup.rs](https://rustup.rs/))
+
+### Install
+
+```bash
+# Recommended: Install to ~/.cargo/bin
+cargo install --path .
+
+# Or use the install script
+./install-rust.sh
+
+# Alternative: Install to ~/.local/bin
+./install-rust.sh local
+```
+
+### Manual Build
+
+```bash
+cargo build --release
+./target/release/fmd --help
+```
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
 ## License
 
 MIT License © 2025 Enjan Chou
+
+---
+
+**Find Markdown files by what matters: metadata.**
