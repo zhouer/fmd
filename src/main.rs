@@ -3,7 +3,7 @@ use clap::Parser;
 use globset::Glob;
 use ignore::WalkBuilder;
 use rayon::prelude::*;
-use regex::RegexBuilder;
+use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -60,6 +60,74 @@ struct Args {
     dirs: Vec<PathBuf>,
 }
 
+/// Pre-compiled filters for efficient matching
+struct CompiledFilters {
+    /// Pre-compiled regex patterns for tags (with lowercase patterns for reference)
+    tag_patterns: Vec<(String, Regex)>,
+
+    /// Pre-lowercased title patterns for case-insensitive matching
+    title_patterns: Vec<String>,
+
+    /// Pre-compiled regex patterns for filename matching
+    name_patterns: Vec<Regex>,
+
+    /// Pre-parsed field filters (field_name, pattern_lowercase)
+    field_patterns: Vec<(String, String)>,
+}
+
+impl CompiledFilters {
+    fn from_args(args: &Args) -> Result<Self> {
+        // Compile tag regex patterns
+        let mut tag_patterns = Vec::new();
+        for tag in &args.tags {
+            let pattern = tag.strip_prefix('#').unwrap_or(tag);
+            // Use word boundaries instead of lookbehind/lookahead (not supported in Rust regex)
+            // Match #tag with optional surrounding non-word characters
+            let regex = RegexBuilder::new(&format!(
+                r"(^|[^[:word:]])#{}([^[:word:]]|$)",
+                regex::escape(pattern)
+            ))
+            .case_insensitive(true)
+            .build()
+            .with_context(|| format!("Failed to compile tag pattern: {}", tag))?;
+            tag_patterns.push((pattern.to_lowercase(), regex));
+        }
+
+        // Pre-lowercase title patterns
+        let title_patterns = args.titles.iter()
+            .map(|t| t.to_lowercase())
+            .collect();
+
+        // Compile filename regex patterns
+        let mut name_patterns = Vec::new();
+        for name in &args.names {
+            let regex = RegexBuilder::new(name)
+                .case_insensitive(args.ignore_case)
+                .build()
+                .with_context(|| format!("Failed to compile filename pattern: {}", name))?;
+            name_patterns.push(regex);
+        }
+
+        // Parse field filters
+        let mut field_patterns = Vec::new();
+        for field_spec in &args.fields {
+            if let Some((field, pattern)) = field_spec.split_once(':') {
+                field_patterns.push((
+                    field.trim().to_string(),
+                    pattern.trim().to_lowercase()
+                ));
+            }
+        }
+
+        Ok(CompiledFilters {
+            tag_patterns,
+            title_patterns,
+            name_patterns,
+            field_patterns,
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct Frontmatter {
     #[serde(default)]
@@ -111,51 +179,35 @@ impl Metadata {
         })
     }
 
-    fn has_tag(&self, pattern: &str) -> bool {
-        // Remove leading # if present
-        let pattern = pattern.strip_prefix('#').unwrap_or(pattern);
-
+    fn has_tag(&self, pattern_lower: &str, tag_regex: &Regex) -> bool {
         // Check YAML frontmatter
         if let Some(ref fm) = self.frontmatter {
             if let Some(ref tags) = fm.tags {
-                if tags.contains_tag(pattern) {
+                if tags.contains_tag(pattern_lower) {
                     return true;
                 }
             }
         }
 
-        // Prepare a case-insensitive regex to match tokenized #tag with word boundaries
-        // Example: matches "#tag", "(#tag)", "#tag,", but not "#tag123"
-        let token_re = RegexBuilder::new(&format!(
-            r"(?i)(?<!\w)#{}(?!\w)",
-            regex::escape(pattern)
-        ))
-        .build()
-        .ok();
-
         if self.full_text {
-            if let Some(re) = &token_re {
-                if re.is_match(&self.raw_content) {
-                    return true;
-                }
+            // Check entire content with regex
+            if tag_regex.is_match(&self.raw_content) {
+                return true;
             }
         } else {
             // In default mode, check within the scanned head lines:
             // 1) lines that start with (possibly indented) "tags:" (case-insensitive)
             // 2) tokenized #tag occurrences within those lines
-            let pattern_lower = pattern.to_lowercase();
             for line in self.raw_content.lines() {
                 let trimmed = line.trim_start();
                 let trimmed_lower = trimmed.to_lowercase();
                 if trimmed_lower.starts_with("tags:") {
-                    if trimmed_lower.contains(&pattern_lower) {
+                    if trimmed_lower.contains(pattern_lower) {
                         return true;
                     }
                 }
-                if let Some(re) = &token_re {
-                    if re.is_match(trimmed) {
-                        return true;
-                    }
+                if tag_regex.is_match(trimmed) {
+                    return true;
                 }
             }
         }
@@ -163,19 +215,18 @@ impl Metadata {
         false
     }
 
-    fn has_title(&self, pattern: &str) -> bool {
-        let pattern_lower = pattern.to_lowercase();
-
+    fn has_title(&self, pattern_lower: &str) -> bool {
         // Check YAML frontmatter title
         if let Some(ref fm) = self.frontmatter {
             if let Some(ref title) = fm.title {
-                if title.to_lowercase().contains(&pattern_lower) {
+                if title.to_lowercase().contains(pattern_lower) {
                     return true;
                 }
             }
         }
 
         // Check markdown headings (levels 1–6), allow leading whitespace
+        const MAX_HEADING_LEVEL: usize = 6;
         for line in self.raw_content.lines() {
             let trimmed = line.trim_start();
             // Count leading '#'
@@ -183,11 +234,11 @@ impl Metadata {
             for ch in trimmed.chars() {
                 if ch == '#' { hashes += 1; } else { break; }
             }
-            if hashes >= 1 && hashes <= 6 {
+            if hashes >= 1 && hashes <= MAX_HEADING_LEVEL {
                 // Expect a space after the hashes
                 let after = &trimmed[hashes..];
                 if after.starts_with(' ') {
-                    if after.to_lowercase().contains(&pattern_lower) {
+                    if after.to_lowercase().contains(pattern_lower) {
                         return true;
                     }
                 }
@@ -197,9 +248,7 @@ impl Metadata {
         false
     }
 
-    fn has_field(&self, field_name: &str, pattern: &str) -> bool {
-        let pattern_lower = pattern.to_lowercase();
-
+    fn has_field(&self, field_name: &str, pattern_lower: &str) -> bool {
         // Check YAML frontmatter
         if let Some(ref fm) = self.frontmatter {
             if let Some(value) = fm.extra.get(field_name) {
@@ -210,7 +259,7 @@ impl Metadata {
                     serde_yaml::Value::Sequence(seq) => {
                         return seq.iter().any(|v| {
                             if let serde_yaml::Value::String(s) = v {
-                                s.to_lowercase().contains(&pattern_lower)
+                                s.to_lowercase().contains(pattern_lower)
                             } else {
                                 false
                             }
@@ -219,7 +268,7 @@ impl Metadata {
                     _ => return false,
                 };
 
-                if value_str.to_lowercase().contains(&pattern_lower) {
+                if value_str.to_lowercase().contains(pattern_lower) {
                     return true;
                 }
             }
@@ -228,8 +277,9 @@ impl Metadata {
         // Check simple inline format
         let field_prefix = format!("{}:", field_name).to_lowercase();
         for line in self.raw_content.lines() {
-            if line.to_lowercase().starts_with(&field_prefix) {
-                if line.to_lowercase().contains(&pattern_lower) {
+            let line_lower = line.to_lowercase();
+            if line_lower.starts_with(&field_prefix) {
+                if line_lower.contains(pattern_lower) {
                     return true;
                 }
             }
@@ -310,38 +360,24 @@ fn extract_frontmatter(content: &str) -> Option<Frontmatter> {
     serde_yaml::from_str(&yaml_content).ok()
 }
 
-fn matches_filename(path: &Path, pattern: &str, ignore_case: bool) -> bool {
+fn matches_filename(path: &Path, regex: &Regex) -> bool {
     let filename = match path.file_name().and_then(|n| n.to_str()) {
         Some(name) => name,
         None => return false,
     };
 
-    // Try regex match first using RegexBuilder for proper case-insensitive support
-    match RegexBuilder::new(pattern)
-        .case_insensitive(ignore_case)
-        .build()
-    {
-        Ok(re) => re.is_match(filename),
-        Err(_) => {
-            // If pattern is not valid regex, fall back to substring matching
-            if ignore_case {
-                filename.to_lowercase().contains(&pattern.to_lowercase())
-            } else {
-                filename.contains(pattern)
-            }
-        }
-    }
+    regex.is_match(filename)
 }
 
 fn should_include_file(
     path: &Path,
     metadata: &Metadata,
-    args: &Args,
+    filters: &CompiledFilters,
 ) -> bool {
     // Check filename filters (fast, no file I/O)
-    if !args.names.is_empty() {
-        let name_matched = args.names.iter().any(|pattern| {
-            matches_filename(path, pattern, args.ignore_case)
+    if !filters.name_patterns.is_empty() {
+        let name_matched = filters.name_patterns.iter().any(|regex| {
+            matches_filename(path, regex)
         });
         if !name_matched {
             return false;
@@ -349,29 +385,29 @@ fn should_include_file(
     }
 
     // Check tag filters
-    if !args.tags.is_empty() {
-        let tag_matched = args.tags.iter().any(|tag| metadata.has_tag(tag));
+    if !filters.tag_patterns.is_empty() {
+        let tag_matched = filters.tag_patterns.iter().any(|(pattern, regex)| {
+            metadata.has_tag(pattern, regex)
+        });
         if !tag_matched {
             return false;
         }
     }
 
     // Check title filters
-    if !args.titles.is_empty() {
-        let title_matched = args.titles.iter().any(|title| metadata.has_title(title));
+    if !filters.title_patterns.is_empty() {
+        let title_matched = filters.title_patterns.iter().any(|pattern| {
+            metadata.has_title(pattern)
+        });
         if !title_matched {
             return false;
         }
     }
 
     // Check field filters
-    if !args.fields.is_empty() {
-        let field_matched = args.fields.iter().any(|field_spec| {
-            if let Some((field, pattern)) = field_spec.split_once(':') {
-                metadata.has_field(field.trim(), pattern.trim())
-            } else {
-                false
-            }
+    if !filters.field_patterns.is_empty() {
+        let field_matched = filters.field_patterns.iter().any(|(field, pattern)| {
+            metadata.has_field(field, pattern)
         });
         if !field_matched {
             return false;
@@ -379,6 +415,16 @@ fn should_include_file(
     }
 
     true
+}
+
+fn output_files(files: &[PathBuf], use_nul: bool) {
+    for file in files {
+        if use_nul {
+            print!("{}\0", file.display());
+        } else {
+            println!("{}", file.display());
+        }
+    }
 }
 
 fn enumerate_files(args: &Args) -> Vec<PathBuf> {
@@ -420,10 +466,19 @@ fn enumerate_files(args: &Args) -> Vec<PathBuf> {
 
             // Additional filtering for specific directories we always want to skip
             // (in case they're not hidden or not in .gitignore)
-            let path_str = path.to_string_lossy();
-            if path_str.contains("/target/")
-                || path_str.contains("/node_modules/")
-                || path_str.contains("/.obsidian/") {
+            // Use proper path component checking instead of string matching
+            let should_skip = path.components().any(|component| {
+                if let std::path::Component::Normal(os_str) = component {
+                    matches!(
+                        os_str.to_str(),
+                        Some("target") | Some("node_modules") | Some(".obsidian")
+                    )
+                } else {
+                    false
+                }
+            });
+
+            if should_skip {
                 continue;
             }
 
@@ -453,16 +508,12 @@ fn main() -> Result<()> {
     {
         // Sort results alphabetically (like ls)
         files.sort();
-
-        for file in files {
-            if args.nul {
-                print!("{}\0", file.display());
-            } else {
-                println!("{}", file.display());
-            }
-        }
+        output_files(&files, args.nul);
         return Ok(());
     }
+
+    // Compile filters once before parallel processing
+    let filters = CompiledFilters::from_args(&args)?;
 
     // Filter files in parallel
     let mut matching_files: Vec<PathBuf> = files
@@ -472,7 +523,7 @@ fn main() -> Result<()> {
             let metadata = Metadata::from_file(path, args.head_lines, args.full_text).ok()?;
 
             // Check filters
-            if should_include_file(path, &metadata, &args) {
+            if should_include_file(path, &metadata, &filters) {
                 Some(path.clone())
             } else {
                 None
@@ -484,13 +535,248 @@ fn main() -> Result<()> {
     matching_files.sort();
 
     // Output results
-    for file in matching_files {
-        if args.nul {
-            print!("{}\0", file.display());
+    output_files(&matching_files, args.nul);
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_frontmatter_valid() {
+        let content = "---\ntitle: Test\ntags: [rust, cli]\n---\n# Content";
+        let fm = extract_frontmatter(content);
+
+        assert!(fm.is_some());
+        let fm = fm.unwrap();
+        assert_eq!(fm.title, Some("Test".to_string()));
+    }
+
+    #[test]
+    fn test_extract_frontmatter_empty() {
+        let content = "---\n---\n# Content";
+        let fm = extract_frontmatter(content);
+
+        assert!(fm.is_none());
+    }
+
+    #[test]
+    fn test_extract_frontmatter_none() {
+        let content = "# Just a heading";
+        let fm = extract_frontmatter(content);
+
+        assert!(fm.is_none());
+    }
+
+    #[test]
+    fn test_extract_frontmatter_multiline_tags() {
+        let content = "---\ntags:\n  - rust\n  - cli\n---\n# Content";
+        let fm = extract_frontmatter(content);
+
+        assert!(fm.is_some());
+        let fm = fm.unwrap();
+        if let Some(TagValue::Array(tags)) = fm.tags {
+            assert_eq!(tags.len(), 2);
+            assert!(tags.contains(&"rust".to_string()));
+            assert!(tags.contains(&"cli".to_string()));
         } else {
-            println!("{}", file.display());
+            panic!("Expected array of tags");
         }
     }
 
-    Ok(())
+    #[test]
+    fn test_tag_value_contains_tag() {
+        let single = TagValue::Single("rust".to_string());
+        assert!(single.contains_tag("rust"));
+        assert!(single.contains_tag("RUST")); // case insensitive
+        assert!(!single.contains_tag("python"));
+
+        let array = TagValue::Array(vec!["rust".to_string(), "cli".to_string()]);
+        assert!(array.contains_tag("rust"));
+        assert!(array.contains_tag("CLI")); // case insensitive
+        assert!(!array.contains_tag("python"));
+    }
+
+    #[test]
+    fn test_compiled_filters_tag_regex() {
+        let args = Args {
+            tags: vec!["rust".to_string(), "python".to_string()],
+            titles: vec![],
+            names: vec![],
+            fields: vec![],
+            nul: false,
+            ignore_case: false,
+            depth: None,
+            glob: "**/*.md".to_string(),
+            head_lines: 10,
+            full_text: false,
+            dirs: vec![PathBuf::from(".")],
+        };
+
+        let filters = CompiledFilters::from_args(&args).unwrap();
+        assert_eq!(filters.tag_patterns.len(), 2);
+
+        // Check that regex matches work
+        let (pattern, regex) = &filters.tag_patterns[0];
+        assert_eq!(pattern, "rust");
+        assert!(regex.is_match("#rust"));
+        assert!(regex.is_match("#RUST")); // case insensitive
+        assert!(!regex.is_match("#rust123")); // word boundary
+    }
+
+    #[test]
+    fn test_compiled_filters_invalid_regex_returns_error() {
+        let args = Args {
+            tags: vec![],
+            titles: vec![],
+            names: vec!["[invalid".to_string()], // Invalid regex
+            fields: vec![],
+            nul: false,
+            ignore_case: false,
+            depth: None,
+            glob: "**/*.md".to_string(),
+            head_lines: 10,
+            full_text: false,
+            dirs: vec![PathBuf::from(".")],
+        };
+
+        let result = CompiledFilters::from_args(&args);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_metadata_has_tag_yaml() {
+        let content = "---\ntags: [rust, cli]\n---\n# Content";
+        let fm = extract_frontmatter(content);
+        let metadata = Metadata {
+            frontmatter: fm,
+            raw_content: content.to_string(),
+            full_text: false,
+        };
+
+        let (pattern, regex) = ("rust".to_string(),
+            regex::RegexBuilder::new(r"(^|[^[:word:]])#rust([^[:word:]]|$)")
+                .case_insensitive(true)
+                .build()
+                .unwrap());
+
+        assert!(metadata.has_tag(&pattern, &regex));
+    }
+
+    #[test]
+    fn test_metadata_has_tag_inline() {
+        let content = "# Title\n\ntags: #rust #cli";
+        let metadata = Metadata {
+            frontmatter: None,
+            raw_content: content.to_string(),
+            full_text: false,
+        };
+
+        let (pattern, regex) = ("rust".to_string(),
+            regex::RegexBuilder::new(r"(^|[^[:word:]])#rust([^[:word:]]|$)")
+                .case_insensitive(true)
+                .build()
+                .unwrap());
+
+        assert!(metadata.has_tag(&pattern, &regex));
+    }
+
+    #[test]
+    fn test_metadata_has_title_yaml() {
+        let content = "---\ntitle: Meeting Notes\n---\n# Content";
+        let fm = extract_frontmatter(content);
+        let metadata = Metadata {
+            frontmatter: fm,
+            raw_content: content.to_string(),
+            full_text: false,
+        };
+
+        assert!(metadata.has_title("meeting"));
+        assert!(!metadata.has_title("other"));
+    }
+
+    #[test]
+    fn test_metadata_has_title_markdown() {
+        let content = "# Meeting Notes 2025\n\nContent here";
+        let metadata = Metadata {
+            frontmatter: None,
+            raw_content: content.to_string(),
+            full_text: false,
+        };
+
+        assert!(metadata.has_title("meeting"));
+        assert!(metadata.has_title("2025"));
+        assert!(!metadata.has_title("other"));
+    }
+
+    #[test]
+    fn test_metadata_has_field() {
+        let content = "---\nauthor: John Doe\nstatus: draft\n---\n# Content";
+        let fm = extract_frontmatter(content);
+        let metadata = Metadata {
+            frontmatter: fm,
+            raw_content: content.to_string(),
+            full_text: false,
+        };
+
+        assert!(metadata.has_field("author", "john"));
+        assert!(metadata.has_field("status", "draft"));
+        assert!(!metadata.has_field("author", "jane"));
+    }
+
+    #[test]
+    fn test_matches_filename_with_regex() {
+        let regex = regex::RegexBuilder::new("2025")
+            .case_insensitive(false)
+            .build()
+            .unwrap();
+
+        let path1 = PathBuf::from("notes-2025-01.md");
+        let path2 = PathBuf::from("notes-2024.md");
+
+        assert!(matches_filename(&path1, &regex));
+        assert!(!matches_filename(&path2, &regex));
+    }
+
+    #[test]
+    fn test_read_file_content_respects_head_lines() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "Line 1").unwrap();
+        writeln!(temp_file, "Line 2").unwrap();
+        writeln!(temp_file, "Line 3").unwrap();
+        writeln!(temp_file, "Line 4").unwrap();
+        writeln!(temp_file, "Line 5").unwrap();
+        temp_file.flush().unwrap();
+
+        let content = read_file_content(temp_file.path(), 3, false).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0], "Line 1");
+        assert_eq!(lines[2], "Line 3");
+    }
+
+    #[test]
+    fn test_read_file_content_full_text() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "Line 1").unwrap();
+        writeln!(temp_file, "Line 2").unwrap();
+        writeln!(temp_file, "Line 3").unwrap();
+        writeln!(temp_file, "Line 4").unwrap();
+        writeln!(temp_file, "Line 5").unwrap();
+        temp_file.flush().unwrap();
+
+        let content = read_file_content(temp_file.path(), 3, true).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+
+        assert_eq!(lines.len(), 5);
+    }
 }
