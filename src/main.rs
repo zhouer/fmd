@@ -15,6 +15,29 @@ use std::path::{Path, PathBuf};
 /// a few lines of content for inline metadata detection.
 const DEFAULT_HEAD_LINES: usize = 10;
 
+/// Maximum number of lines to read for frontmatter to prevent memory issues.
+/// Frontmatter exceeding this limit will cause the file to be skipped with an error.
+const MAX_FRONTMATTER_LINES: usize = 1000;
+
+/// Directories to always skip during file enumeration.
+/// These are common build artifacts, dependencies, caches, and tool-specific directories.
+const EXCLUDED_DIRS: &[&str] = &[
+    // Build artifacts
+    "target", "build", "dist", "out", "bin", "obj",
+    // Dependencies
+    "node_modules", "vendor", "bower_components",
+    // Python
+    "__pycache__",
+    // Caches
+    ".cache", ".parcel-cache", ".gradle", ".m2",
+    // Frontend frameworks
+    ".next", ".nuxt", ".vitepress", ".docusaurus", ".output", ".serverless",
+    // IDEs and editors
+    ".idea", ".vscode", ".vs", ".obsidian",
+    // Temporary and test coverage
+    "tmp", "temp", "coverage", ".nyc_output", ".pytest_cache", ".tox",
+];
+
 /// fmd — Find Markdown files by metadata
 #[derive(Parser, Debug)]
 #[command(name = "fmd")]
@@ -71,7 +94,7 @@ struct Args {
 
 /// Pre-compiled filters for efficient matching
 struct CompiledFilters {
-    /// Pre-compiled regex patterns for tags (with lowercase patterns for reference)
+    /// Tag patterns: (lowercase_pattern, regex) for matching both YAML and inline tags
     tag_patterns: Vec<(String, Regex)>,
 
     /// Pre-lowercased title patterns for case-insensitive matching
@@ -120,12 +143,15 @@ impl CompiledFilters {
         // Parse field filters
         let mut field_patterns = Vec::new();
         for field_spec in &args.fields {
-            if let Some((field, pattern)) = field_spec.split_once(':') {
-                field_patterns.push((
-                    field.trim().to_string(),
-                    pattern.trim().to_lowercase()
-                ));
-            }
+            let (field, pattern) = field_spec.split_once(':')
+                .ok_or_else(|| anyhow::anyhow!(
+                    "Invalid field filter format: '{}'. Expected 'field:pattern'",
+                    field_spec
+                ))?;
+            field_patterns.push((
+                field.trim().to_string(),
+                pattern.trim().to_lowercase()
+            ));
         }
 
         Ok(CompiledFilters {
@@ -166,6 +192,19 @@ impl TagValue {
     }
 }
 
+/// Helper function to match a pattern against various YAML value types (case-insensitive)
+fn yaml_value_contains(value: &serde_yaml::Value, pattern_lower: &str) -> bool {
+    match value {
+        serde_yaml::Value::String(s) => s.to_lowercase().contains(pattern_lower),
+        serde_yaml::Value::Number(n) => n.to_string().to_lowercase().contains(pattern_lower),
+        serde_yaml::Value::Bool(b) => b.to_string().to_lowercase().contains(pattern_lower),
+        serde_yaml::Value::Sequence(seq) => {
+            seq.iter().any(|v| yaml_value_contains(v, pattern_lower))
+        }
+        _ => false,
+    }
+}
+
 /// Metadata extracted from a markdown file.
 ///
 /// Design note: This struct stores `raw_content` as a String, which may seem memory-intensive.
@@ -199,7 +238,7 @@ impl Metadata {
     }
 
     fn has_tag(&self, pattern_lower: &str, tag_regex: &Regex) -> bool {
-        // Check YAML frontmatter
+        // Check YAML frontmatter (case-insensitive)
         if let Some(ref fm) = self.frontmatter {
             if let Some(ref tags) = fm.tags {
                 if tags.contains_tag(pattern_lower) {
@@ -208,8 +247,7 @@ impl Metadata {
             }
         }
 
-        // Check inline tags with regex (works for both full_text and default mode)
-        // This provides consistent behavior across both modes
+        // Check inline tags with regex (case-insensitive, works for both full_text and default mode)
         tag_regex.is_match(&self.raw_content)
     }
 
@@ -250,45 +288,23 @@ impl Metadata {
         // Check YAML frontmatter
         if let Some(ref fm) = self.frontmatter {
             if let Some(value) = fm.extra.get(field_name) {
-                match value {
-                    serde_yaml::Value::String(s) => {
-                        if s.to_lowercase().contains(pattern_lower) {
-                            return true;
-                        }
-                    }
-                    serde_yaml::Value::Number(n) => {
-                        if n.to_string().to_lowercase().contains(pattern_lower) {
-                            return true;
-                        }
-                    }
-                    serde_yaml::Value::Bool(b) => {
-                        if b.to_string().to_lowercase().contains(pattern_lower) {
-                            return true;
-                        }
-                    }
-                    serde_yaml::Value::Sequence(seq) => {
-                        if seq.iter().any(|v| {
-                            if let serde_yaml::Value::String(s) = v {
-                                s.to_lowercase().contains(pattern_lower)
-                            } else {
-                                false
-                            }
-                        }) {
-                            return true;
-                        }
-                    }
-                    _ => {}
+                if yaml_value_contains(value, pattern_lower) {
+                    return true;
                 }
             }
         }
 
-        // Check simple inline format
-        let field_prefix = format!("{}:", field_name).to_lowercase();
+        // Check simple inline format (key: value)
+        // Only search in the value part, not the key
         for line in self.raw_content.lines() {
-            let line_lower = line.to_lowercase();
-            if line_lower.starts_with(&field_prefix) {
-                if line_lower.contains(pattern_lower) {
-                    return true;
+            let trimmed = line.trim_start();
+            if let Some(colon_pos) = trimmed.find(':') {
+                let key = &trimmed[..colon_pos];
+                if key.eq_ignore_ascii_case(field_name) {
+                    let value = &trimmed[colon_pos + 1..];
+                    if value.to_lowercase().contains(pattern_lower) {
+                        return true;
+                    }
                 }
             }
         }
@@ -333,6 +349,15 @@ fn read_file_content(path: &Path, head_lines: usize, full_text: bool) -> Result<
         lines_vec.push(line);
         line_count += 1;
 
+        // Check for excessively large frontmatter
+        if in_frontmatter && line_count > MAX_FRONTMATTER_LINES {
+            return Err(anyhow::anyhow!(
+                "Frontmatter exceeds maximum size ({} lines) in: {}",
+                MAX_FRONTMATTER_LINES,
+                path.display()
+            ));
+        }
+
         // Stop reading if:
         // 1. We've read enough lines AND
         // 2. We're not in the middle of frontmatter
@@ -344,6 +369,10 @@ fn read_file_content(path: &Path, head_lines: usize, full_text: bool) -> Result<
     Ok(lines_vec.join("\n"))
 }
 
+/// Extracts YAML frontmatter from markdown content.
+///
+/// Frontmatter must be delimited by `---` at the start and end.
+/// Returns `None` if no valid frontmatter is found or if YAML parsing fails.
 fn extract_frontmatter(content: &str, path: &Path, verbose: bool) -> Option<Frontmatter> {
     let mut lines = content.lines();
 
@@ -377,6 +406,7 @@ fn extract_frontmatter(content: &str, path: &Path, verbose: bool) -> Option<Fron
     }
 }
 
+/// Checks if a file path's filename matches a given regex pattern.
 fn matches_filename(path: &Path, regex: &Regex) -> bool {
     let filename = match path.file_name().and_then(|n| n.to_str()) {
         Some(name) => name,
@@ -386,11 +416,15 @@ fn matches_filename(path: &Path, regex: &Regex) -> bool {
     regex.is_match(filename)
 }
 
+/// Determines if a file should be included based on its content metadata.
+///
+/// Applies all content-based filters (tags, titles, fields) with AND logic between filter types
+/// and OR logic within each filter type (e.g., match any of the specified tags).
 fn should_include_file_by_content(
     metadata: &Metadata,
     filters: &CompiledFilters,
 ) -> bool {
-    // Check tag filters
+    // Check tag filters (OR logic: match any tag)
     if !filters.tag_patterns.is_empty() {
         let tag_matched = filters.tag_patterns.iter().any(|(pattern, regex)| {
             metadata.has_tag(pattern, regex)
@@ -423,6 +457,7 @@ fn should_include_file_by_content(
     true
 }
 
+/// Outputs file paths to stdout, either newline-delimited or NUL-delimited.
 fn output_files(files: &[PathBuf], use_nul: bool) {
     for file in files {
         if use_nul {
@@ -433,6 +468,9 @@ fn output_files(files: &[PathBuf], use_nul: bool) {
     }
 }
 
+/// Enumerates all files matching the glob pattern in the specified directories.
+///
+/// Respects .gitignore, .ignore files, and skips hidden files and common build/cache directories.
 fn enumerate_files(args: &Args) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
@@ -470,29 +508,13 @@ fn enumerate_files(args: &Args) -> Result<Vec<PathBuf>> {
 
             // Additional filtering for specific directories we always want to skip
             // (in case they're not hidden or not in .gitignore)
-            // Use proper path component checking instead of string matching
             let should_skip = path.components().any(|component| {
                 if let std::path::Component::Normal(os_str) = component {
-                    matches!(
-                        os_str.to_str(),
-                        // Build artifacts
-                        Some("target") | Some("build") | Some("dist") | Some("out") |
-                        Some("bin") | Some("obj") |
-                        // Dependencies
-                        Some("node_modules") | Some("vendor") | Some("bower_components") |
-                        // Python
-                        Some("__pycache__") |
-                        // Caches
-                        Some(".cache") | Some(".parcel-cache") | Some(".gradle") | Some(".m2") |
-                        // Frontend frameworks
-                        Some(".next") | Some(".nuxt") | Some(".vitepress") | Some(".docusaurus") |
-                        Some(".output") | Some(".serverless") |
-                        // IDEs and editors
-                        Some(".idea") | Some(".vscode") | Some(".vs") | Some(".obsidian") |
-                        // Temporary and test coverage
-                        Some("tmp") | Some("temp") | Some("coverage") | Some(".nyc_output") |
-                        Some(".pytest_cache") | Some(".tox")
-                    )
+                    if let Some(dir_name) = os_str.to_str() {
+                        EXCLUDED_DIRS.contains(&dir_name)
+                    } else {
+                        false
+                    }
                 } else {
                     false
                 }
@@ -514,26 +536,23 @@ fn enumerate_files(args: &Args) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
-
+/// Core logic for finding matching markdown files based on filters
+fn find_matching_files(args: &Args) -> Result<Vec<PathBuf>> {
     // Enumerate all markdown files
-    let mut files = enumerate_files(&args)?;
+    let mut files = enumerate_files(args)?;
 
-    // If no filters, just output all files
+    // If no filters, return all files sorted
     if args.tags.is_empty()
         && args.titles.is_empty()
         && args.names.is_empty()
         && args.fields.is_empty()
     {
-        // Sort results alphabetically (like ls)
         files.sort();
-        output_files(&files, args.nul);
-        return Ok(());
+        return Ok(files);
     }
 
     // Compile filters once before parallel processing
-    let filters = CompiledFilters::from_args(&args)?;
+    let filters = CompiledFilters::from_args(args)?;
 
     // Early filtering: check filename patterns first (no I/O required)
     if !filters.name_patterns.is_empty() {
@@ -574,9 +593,13 @@ fn main() -> Result<()> {
     // Sort results alphabetically (like ls)
     matching_files.sort();
 
-    // Output results
-    output_files(&matching_files, args.nul);
+    Ok(matching_files)
+}
 
+fn main() -> Result<()> {
+    let args = Args::parse();
+    let matching_files = find_matching_files(&args)?;
+    output_files(&matching_files, args.nul);
     Ok(())
 }
 
