@@ -3,7 +3,7 @@ use clap::Parser;
 use globset::Glob;
 use ignore::WalkBuilder;
 use rayon::prelude::*;
-use regex::Regex;
+use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -291,22 +291,19 @@ fn matches_filename(path: &Path, pattern: &str, ignore_case: bool) -> bool {
         None => return false,
     };
 
-    if ignore_case {
-        let filename_lower = filename.to_lowercase();
-        let pattern_lower = pattern.to_lowercase();
-
-        // Try regex match
-        if let Ok(re) = Regex::new(&pattern_lower) {
-            re.is_match(&filename_lower)
-        } else {
-            filename_lower.contains(&pattern_lower)
-        }
-    } else {
-        // Try regex match
-        if let Ok(re) = Regex::new(pattern) {
-            re.is_match(filename)
-        } else {
-            filename.contains(pattern)
+    // Try regex match first using RegexBuilder for proper case-insensitive support
+    match RegexBuilder::new(pattern)
+        .case_insensitive(ignore_case)
+        .build()
+    {
+        Ok(re) => re.is_match(filename),
+        Err(_) => {
+            // If pattern is not valid regex, fall back to substring matching
+            if ignore_case {
+                filename.to_lowercase().contains(&pattern.to_lowercase())
+            } else {
+                filename.contains(pattern)
+            }
         }
     }
 }
