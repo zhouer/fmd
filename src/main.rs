@@ -44,7 +44,7 @@ struct Args {
     fields: Vec<String>,
 
     /// File pattern to match
-    #[arg(long = "glob", default_value = "*.md")]
+    #[arg(long = "glob", default_value = "**/*.md")]
     glob: String,
 
     /// Lines to scan for metadata
@@ -124,21 +124,36 @@ impl Metadata {
             }
         }
 
-        let pattern_lower = pattern.to_lowercase();
+        // Prepare a case-insensitive regex to match tokenized #tag with word boundaries
+        // Example: matches "#tag", "(#tag)", "#tag,", but not "#tag123"
+        let token_re = RegexBuilder::new(&format!(
+            r"(?i)(?<!\w)#{}(?!\w)",
+            regex::escape(pattern)
+        ))
+        .build()
+        .ok();
 
-        // In full-text mode, search for #tag anywhere in the content
         if self.full_text {
-            let tag_with_hash = format!("#{}", pattern_lower);
-            for line in self.raw_content.lines() {
-                if line.to_lowercase().contains(&tag_with_hash) {
+            if let Some(re) = &token_re {
+                if re.is_match(&self.raw_content) {
                     return true;
                 }
             }
         } else {
-            // In default mode, only check lines starting with "tags:"
+            // In default mode, check within the scanned head lines:
+            // 1) lines that start with (possibly indented) "tags:" (case-insensitive)
+            // 2) tokenized #tag occurrences within those lines
+            let pattern_lower = pattern.to_lowercase();
             for line in self.raw_content.lines() {
-                if line.to_lowercase().starts_with("tags:") {
-                    if line.to_lowercase().contains(&pattern_lower) {
+                let trimmed = line.trim_start();
+                let trimmed_lower = trimmed.to_lowercase();
+                if trimmed_lower.starts_with("tags:") {
+                    if trimmed_lower.contains(&pattern_lower) {
+                        return true;
+                    }
+                }
+                if let Some(re) = &token_re {
+                    if re.is_match(trimmed) {
                         return true;
                     }
                 }
@@ -160,11 +175,21 @@ impl Metadata {
             }
         }
 
-        // Check markdown heading
+        // Check markdown headings (levels 1–6), allow leading whitespace
         for line in self.raw_content.lines() {
-            if line.starts_with("# ") {
-                if line.to_lowercase().contains(&pattern_lower) {
-                    return true;
+            let trimmed = line.trim_start();
+            // Count leading '#'
+            let mut hashes = 0;
+            for ch in trimmed.chars() {
+                if ch == '#' { hashes += 1; } else { break; }
+            }
+            if hashes >= 1 && hashes <= 6 {
+                // Expect a space after the hashes
+                let after = &trimmed[hashes..];
+                if after.starts_with(' ') {
+                    if after.to_lowercase().contains(&pattern_lower) {
+                        return true;
+                    }
                 }
             }
         }

@@ -218,7 +218,7 @@ fmd -t archive | xargs tar -czf archive.tar.gz
 | `-T, --title PAT` | Filter by title (case-insensitive, regex) |
 | `-n, --name PAT` | Filter by filename (regex) |
 | `-f, --field F:P` | Filter by frontmatter field (format: `field:pattern`) |
-| `--glob GLOB` | File pattern to match (default: `*.md`) |
+| `--glob GLOB` | File pattern to match (default: `**/*.md`) |
 | `--head N` | Lines to scan for metadata (default: 10) |
 | `--full-text` | Search entire file content |
 | `-h, --help` | Show help message |
