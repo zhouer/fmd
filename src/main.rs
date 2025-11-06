@@ -336,13 +336,12 @@ impl Metadata {
             for ch in trimmed.chars() {
                 if ch == '#' { hashes += 1; } else { break; }
             }
-            if hashes >= 1 && hashes <= MAX_HEADING_LEVEL {
+            if (1..=MAX_HEADING_LEVEL).contains(&hashes) {
                 // Expect a space after the hashes
                 let after = &trimmed[hashes..];
-                if after.starts_with(' ') {
-                    if after.to_lowercase().contains(pattern_lower) {
-                        return true;
-                    }
+                if after.starts_with(' ')
+                    && after.to_lowercase().contains(pattern_lower) {
+                    return true;
                 }
             }
         }
@@ -428,8 +427,8 @@ impl Metadata {
 
         // Check if ANY date satisfies the filters
         dates.iter().any(|date| {
-            let after_check = date_after.map_or(true, |after| date >= &after);
-            let before_check = date_before.map_or(true, |before| date <= &before);
+            let after_check = date_after.is_none_or(|after| date >= &after);
+            let before_check = date_before.is_none_or(|before| date <= &before);
             after_check && before_check
         })
     }
@@ -576,10 +575,9 @@ fn should_include_file_by_content(
     }
 
     // Check date filters (if any date filter is specified)
-    if filters.date_after.is_some() || filters.date_before.is_some() {
-        if !metadata.matches_date_filters(filters.date_after, filters.date_before) {
-            return false;
-        }
+    if (filters.date_after.is_some() || filters.date_before.is_some())
+        && !metadata.matches_date_filters(filters.date_after, filters.date_before) {
+        return false;
     }
 
     true
