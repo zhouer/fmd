@@ -4,13 +4,6 @@
 
 Search Markdown files by tags, frontmatter, and custom fields. Built for note-takers who organize with metadata.
 
-```bash
-fmd --tag python              # Find all notes tagged with python
-fmd --title "meeting"         # Find notes with "meeting" in title
-fmd --tag work --tag urgent   # Find notes with work OR urgent tags
-fmd --author "John"           # Find notes by John
-```
-
 [![CI](https://github.com/zhouer/fmd/workflows/CI/badge.svg)](https://github.com/zhouer/fmd/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/zhouer/fmd/branch/master/graph/badge.svg)](https://codecov.io/gh/zhouer/fmd)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
