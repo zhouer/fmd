@@ -1,8 +1,8 @@
 # fmd — Find Markdown files by metadata
 
-**A command-line tool that understands your notes.**
+**The command-line companion for your knowledge base.**
 
-Search Markdown files by tags, frontmatter, and custom fields. Built for note-takers who organize with metadata.
+**fmd** finds Markdown files by tags, frontmatter, and custom metadata. Pipe the results to `xargs` to move notes by tags, to `grep` to search content, or to any Unix tool to build custom workflows. If you organize notes with metadata, fmd gives you the power to act on it.
 
 [![CI](https://github.com/zhouer/fmd/workflows/CI/badge.svg)](https://github.com/zhouer/fmd/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/zhouer/fmd/branch/master/graph/badge.svg)](https://codecov.io/gh/zhouer/fmd)
