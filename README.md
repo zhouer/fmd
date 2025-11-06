@@ -16,8 +16,8 @@
 - **🗂 Metadata-aware** — Understands YAML frontmatter and inline `#tags`
 - **🔍 Flexible filtering** — By tag, title, filename, date, or any custom field
 - **🧩 Unix-friendly** — Compose with `xargs`, `grep`, `fzf`
-- **🎯 Zero-config** — No database, no indexing required
-- **⚡ Fast** — Parallel processing with Rust
+- **🎯 Zero-setup** — No database, no indexing required
+- **⚡ Fast** — Smart filtering, reads metadata only, parallel processing
 
 ---
 
@@ -26,11 +26,11 @@
 ### Installation
 
 ```bash
-# From source (requires Rust)
-cargo install --path .
+# From crates.io (recommended)
+cargo install fmd
 
-# Or use the install script
-./install-rust.sh
+# From source
+cargo install --path .
 ```
 
 ### Basic Usage
@@ -209,6 +209,45 @@ fmd -t work --date-after 2025-01-01  # Work notes from 2025
 
 **Date format:** `YYYY-MM-DD` (ISO 8601)
 
+### Combining Filters
+
+Filters of the same type use **OR** logic, while different types use **AND** logic:
+
+#### Same Type → OR
+
+```bash
+fmd -t A -t B              # A OR B
+fmd -a X -a Y              # X OR Y
+```
+
+#### Different Types → AND
+
+```bash
+fmd -t A -T B              # A AND B
+fmd -t A -f status:draft   # A AND draft
+```
+
+#### Complex Example
+
+```bash
+# (tag=work OR tag=personal) AND title=meeting AND author=John
+fmd -t work -t personal -T meeting -a "John"
+```
+
+### Full-Text Search
+
+By default, fmd scans only the **first 10 lines** for inline tags (controlled by `--head`). Use `--full-text` to search the entire file:
+
+```bash
+fmd -t project                 # YAML + inline tags in first 10 lines
+fmd -t project --full-text     # Anywhere in content
+```
+
+| Mode | YAML `tags:` | Inline `tags:` | Content `#tag` |
+|------|--------------|----------------|----------------|
+| Default | ✓ | ✓ (first 10 lines) | ✗ |
+| `--full-text` | ✓ | ✓ (entire file) | ✓ |
+
 ---
 
 ## Command-Line Options
@@ -230,47 +269,6 @@ fmd -t work --date-after 2025-01-01  # Work notes from 2025
 | `-0` | NUL-delimited output (safe for filenames with spaces) |
 | `-v, --verbose` | Show verbose output including warnings and errors |
 | `-h, --help` | Show help message |
-
----
-
-## Filter Logic
-
-### Same Type → OR
-
-```bash
-fmd -t A -t B              # A OR B
-fmd -a X -a Y              # X OR Y
-```
-
-### Different Types → AND
-
-```bash
-fmd -t A -T B              # A AND B
-fmd -t A -f status:draft   # A AND draft
-```
-
-### Complex Example
-
-```bash
-# (tag=work OR tag=personal) AND title=meeting AND author=John
-fmd -t work -t personal -T meeting -a "John"
-```
-
----
-
-## Full-Text Search
-
-By default, fmd scans only the **first 10 lines** for inline tags (controlled by `--head`). Use `--full-text` to search the entire file:
-
-```bash
-fmd -t project                 # YAML + inline tags in first 10 lines
-fmd -t project --full-text     # Anywhere in content
-```
-
-| Mode | YAML `tags:` | Inline `tags:` | Content `#tag` |
-|------|--------------|----------------|----------------|
-| Default | ✓ | ✓ (first 10 lines) | ✗ |
-| `--full-text` | ✓ | ✓ (entire file) | ✓ |
 
 ---
 
@@ -333,26 +331,15 @@ fmd -T meeting --date-after 2025-10-01
 
 ## Building from Source
 
-### Requirements
-
-- Rust 1.91 or later (install from [rustup.rs](https://rustup.rs/))
-
-### Install
+**Requirements:** Rust 1.91+ ([install from rustup.rs](https://rustup.rs/))
 
 ```bash
-# Recommended: Install to ~/.cargo/bin
+# Clone and install
+git clone https://github.com/zhouer/fmd.git
+cd fmd
 cargo install --path .
 
-# Or use the install script
-./install-rust.sh
-
-# Alternative: Install to ~/.local/bin
-./install-rust.sh local
-```
-
-### Manual Build
-
-```bash
+# Or just build without installing
 cargo build --release
 ./target/release/fmd --help
 ```
