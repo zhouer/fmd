@@ -57,111 +57,44 @@ fn test_compiled_filters_invalid_regex_returns_error() {
 }
 
 #[test]
-fn test_compiled_filters_empty_field_name() {
-    let args = Args {
-        tags: vec![],
-        titles: vec![],
-        authors: vec![],
-        names: vec![],
-        fields: vec![":pattern".to_string()], // Empty field name
-        nul: false,
-        ignore_case: false,
-        depth: None,
-        glob: "**/*.md".to_string(),
-        head_lines: 10,
-        full_text: false,
-        verbose: false,
-        date_after: None,
-        date_before: None,
-        dirs: vec![PathBuf::from(".")],
-    };
+fn test_compiled_filters_field_validation_errors() {
+    // Test various field validation errors with table-driven approach
+    let test_cases = vec![
+        (":pattern", "Field name cannot be empty"),
+        ("field:", "Pattern cannot be empty"),
+        (":", "Both field and pattern cannot be empty"),
+        ("  :pattern", "Field name cannot be empty"),
+    ];
 
-    let result = CompiledFilters::from_args(&args);
-    assert!(result.is_err());
-    if let Err(e) = result {
-        assert!(e.to_string().contains("Field name cannot be empty"));
-    }
-}
+    for (field_input, expected_error) in test_cases {
+        let args = Args {
+            tags: vec![],
+            titles: vec![],
+            authors: vec![],
+            names: vec![],
+            fields: vec![field_input.to_string()],
+            nul: false,
+            ignore_case: false,
+            depth: None,
+            glob: "**/*.md".to_string(),
+            head_lines: 10,
+            full_text: false,
+            verbose: false,
+            date_after: None,
+            date_before: None,
+            dirs: vec![PathBuf::from(".")],
+        };
 
-#[test]
-fn test_compiled_filters_empty_pattern() {
-    let args = Args {
-        tags: vec![],
-        titles: vec![],
-        authors: vec![],
-        names: vec![],
-        fields: vec!["field:".to_string()], // Empty pattern
-        nul: false,
-        ignore_case: false,
-        depth: None,
-        glob: "**/*.md".to_string(),
-        head_lines: 10,
-        full_text: false,
-        verbose: false,
-        date_after: None,
-        date_before: None,
-        dirs: vec![PathBuf::from(".")],
-    };
-
-    let result = CompiledFilters::from_args(&args);
-    assert!(result.is_err());
-    if let Err(e) = result {
-        assert!(e.to_string().contains("Pattern cannot be empty"));
-    }
-}
-
-#[test]
-fn test_compiled_filters_empty_field_and_pattern() {
-    let args = Args {
-        tags: vec![],
-        titles: vec![],
-        authors: vec![],
-        names: vec![],
-        fields: vec![":".to_string()], // Both empty
-        nul: false,
-        ignore_case: false,
-        depth: None,
-        glob: "**/*.md".to_string(),
-        head_lines: 10,
-        full_text: false,
-        verbose: false,
-        date_after: None,
-        date_before: None,
-        dirs: vec![PathBuf::from(".")],
-    };
-
-    let result = CompiledFilters::from_args(&args);
-    assert!(result.is_err());
-    if let Err(e) = result {
-        assert!(e
-            .to_string()
-            .contains("Both field and pattern cannot be empty"));
-    }
-}
-
-#[test]
-fn test_compiled_filters_whitespace_only_field() {
-    let args = Args {
-        tags: vec![],
-        titles: vec![],
-        authors: vec![],
-        names: vec![],
-        fields: vec!["  :pattern".to_string()], // Whitespace-only field
-        nul: false,
-        ignore_case: false,
-        depth: None,
-        glob: "**/*.md".to_string(),
-        head_lines: 10,
-        full_text: false,
-        verbose: false,
-        date_after: None,
-        date_before: None,
-        dirs: vec![PathBuf::from(".")],
-    };
-
-    let result = CompiledFilters::from_args(&args);
-    assert!(result.is_err());
-    if let Err(e) = result {
-        assert!(e.to_string().contains("Field name cannot be empty"));
+        let result = CompiledFilters::from_args(&args);
+        assert!(result.is_err(), "Expected error for input: {}", field_input);
+        if let Err(e) = result {
+            assert!(
+                e.to_string().contains(expected_error),
+                "Expected '{}' for input '{}', got '{}'",
+                expected_error,
+                field_input,
+                e
+            );
+        }
     }
 }
