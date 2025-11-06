@@ -41,10 +41,16 @@ fn test_list_all_markdown_files() {
 fn test_filter_by_yaml_tag() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "with_tag.md",
-        "---\ntags: [rust, cli]\n---\n# Content");
-    create_test_file(&temp_dir, "without_tag.md",
-        "---\ntags: [python]\n---\n# Content");
+    create_test_file(
+        &temp_dir,
+        "with_tag.md",
+        "---\ntags: [rust, cli]\n---\n# Content",
+    );
+    create_test_file(
+        &temp_dir,
+        "without_tag.md",
+        "---\ntags: [python]\n---\n# Content",
+    );
 
     let output = run_fmd(&["--tag", "rust"], &temp_dir);
 
@@ -56,10 +62,16 @@ fn test_filter_by_yaml_tag() {
 fn test_filter_by_inline_tag() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "with_inline.md",
-        "# My Note\n\ntags: #rust #programming");
-    create_test_file(&temp_dir, "without_inline.md",
-        "# Other Note\n\ntags: #python");
+    create_test_file(
+        &temp_dir,
+        "with_inline.md",
+        "# My Note\n\ntags: #rust #programming",
+    );
+    create_test_file(
+        &temp_dir,
+        "without_inline.md",
+        "# Other Note\n\ntags: #python",
+    );
 
     let output = run_fmd(&["--tag", "rust"], &temp_dir);
 
@@ -71,10 +83,16 @@ fn test_filter_by_inline_tag() {
 fn test_filter_by_yaml_title() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "meeting.md",
-        "---\ntitle: Meeting Notes\n---\n# Content");
-    create_test_file(&temp_dir, "other.md",
-        "---\ntitle: Other Document\n---\n# Content");
+    create_test_file(
+        &temp_dir,
+        "meeting.md",
+        "---\ntitle: Meeting Notes\n---\n# Content",
+    );
+    create_test_file(
+        &temp_dir,
+        "other.md",
+        "---\ntitle: Other Document\n---\n# Content",
+    );
 
     let output = run_fmd(&["--title", "meeting"], &temp_dir);
 
@@ -112,10 +130,16 @@ fn test_filter_by_filename() {
 fn test_filter_by_custom_field() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "johns_note.md",
-        "---\nauthor: John Doe\n---\n# Content");
-    create_test_file(&temp_dir, "janes_note.md",
-        "---\nauthor: Jane Smith\n---\n# Content");
+    create_test_file(
+        &temp_dir,
+        "johns_note.md",
+        "---\nauthor: John Doe\n---\n# Content",
+    );
+    create_test_file(
+        &temp_dir,
+        "janes_note.md",
+        "---\nauthor: Jane Smith\n---\n# Content",
+    );
 
     let output = run_fmd(&["--field", "author:John"], &temp_dir);
 
@@ -127,12 +151,21 @@ fn test_filter_by_custom_field() {
 fn test_combined_filters_and_logic() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "match_both.md",
-        "---\ntags: [rust]\nauthor: John\n---\n# Content");
-    create_test_file(&temp_dir, "match_tag_only.md",
-        "---\ntags: [rust]\nauthor: Jane\n---\n# Content");
-    create_test_file(&temp_dir, "match_author_only.md",
-        "---\ntags: [python]\nauthor: John\n---\n# Content");
+    create_test_file(
+        &temp_dir,
+        "match_both.md",
+        "---\ntags: [rust]\nauthor: John\n---\n# Content",
+    );
+    create_test_file(
+        &temp_dir,
+        "match_tag_only.md",
+        "---\ntags: [rust]\nauthor: Jane\n---\n# Content",
+    );
+    create_test_file(
+        &temp_dir,
+        "match_author_only.md",
+        "---\ntags: [python]\nauthor: John\n---\n# Content",
+    );
 
     let output = run_fmd(&["--tag", "rust", "--field", "author:John"], &temp_dir);
 
@@ -145,12 +178,13 @@ fn test_combined_filters_and_logic() {
 fn test_multiple_tags_or_logic() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "rust.md",
-        "---\ntags: [rust]\n---\n# Content");
-    create_test_file(&temp_dir, "python.md",
-        "---\ntags: [python]\n---\n# Content");
-    create_test_file(&temp_dir, "java.md",
-        "---\ntags: [java]\n---\n# Content");
+    create_test_file(&temp_dir, "rust.md", "---\ntags: [rust]\n---\n# Content");
+    create_test_file(
+        &temp_dir,
+        "python.md",
+        "---\ntags: [python]\n---\n# Content",
+    );
+    create_test_file(&temp_dir, "java.md", "---\ntags: [java]\n---\n# Content");
 
     let output = run_fmd(&["--tag", "rust", "--tag", "python"], &temp_dir);
 
@@ -204,7 +238,11 @@ fn test_empty_frontmatter() {
 fn test_malformed_frontmatter() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "malformed.md", "---\ninvalid: [yaml\n---\n# Content");
+    create_test_file(
+        &temp_dir,
+        "malformed.md",
+        "---\ninvalid: [yaml\n---\n# Content",
+    );
 
     // Should not crash, should handle gracefully
     let output = run_fmd(&[], &temp_dir);
@@ -216,8 +254,11 @@ fn test_malformed_frontmatter() {
 fn test_multiline_yaml_tags() {
     let temp_dir = TempDir::new().unwrap();
 
-    create_test_file(&temp_dir, "multiline.md",
-        "---\ntags:\n  - rust\n  - cli\n  - tools\n---\n# Content");
+    create_test_file(
+        &temp_dir,
+        "multiline.md",
+        "---\ntags:\n  - rust\n  - cli\n  - tools\n---\n# Content",
+    );
 
     let output = run_fmd(&["--tag", "cli"], &temp_dir);
 

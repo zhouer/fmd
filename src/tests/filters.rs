@@ -128,7 +128,9 @@ fn test_compiled_filters_empty_field_and_pattern() {
     let result = CompiledFilters::from_args(&args);
     assert!(result.is_err());
     if let Err(e) = result {
-        assert!(e.to_string().contains("Both field and pattern cannot be empty"));
+        assert!(e
+            .to_string()
+            .contains("Both field and pattern cannot be empty"));
     }
 }
 

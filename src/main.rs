@@ -24,19 +24,42 @@ const MAX_FRONTMATTER_LINES: usize = 1000;
 /// These are common build artifacts, dependencies, caches, and tool-specific directories.
 const EXCLUDED_DIRS: &[&str] = &[
     // Build artifacts
-    "target", "build", "dist", "out", "bin", "obj",
+    "target",
+    "build",
+    "dist",
+    "out",
+    "bin",
+    "obj",
     // Dependencies
-    "node_modules", "vendor", "bower_components",
+    "node_modules",
+    "vendor",
+    "bower_components",
     // Python
     "__pycache__",
     // Caches
-    ".cache", ".parcel-cache", ".gradle", ".m2",
+    ".cache",
+    ".parcel-cache",
+    ".gradle",
+    ".m2",
     // Frontend frameworks
-    ".next", ".nuxt", ".vitepress", ".docusaurus", ".output", ".serverless",
+    ".next",
+    ".nuxt",
+    ".vitepress",
+    ".docusaurus",
+    ".output",
+    ".serverless",
     // IDEs and editors
-    ".idea", ".vscode", ".vs", ".obsidian",
+    ".idea",
+    ".vscode",
+    ".vs",
+    ".obsidian",
     // Temporary and test coverage
-    "tmp", "temp", "coverage", ".nyc_output", ".pytest_cache", ".tox",
+    "tmp",
+    "temp",
+    "coverage",
+    ".nyc_output",
+    ".pytest_cache",
+    ".tox",
 ];
 
 /// fmd — Find Markdown files by metadata
@@ -141,9 +164,7 @@ impl CompiledFilters {
         }
 
         // Pre-lowercase title patterns
-        let title_patterns = args.titles.iter()
-            .map(|t| t.to_lowercase())
-            .collect();
+        let title_patterns = args.titles.iter().map(|t| t.to_lowercase()).collect();
 
         // Compile filename regex patterns
         let mut name_patterns = Vec::new();
@@ -158,11 +179,12 @@ impl CompiledFilters {
         // Parse field filters
         let mut field_patterns = Vec::new();
         for field_spec in &args.fields {
-            let (field, pattern) = field_spec.split_once(':')
-                .ok_or_else(|| anyhow::anyhow!(
+            let (field, pattern) = field_spec.split_once(':').ok_or_else(|| {
+                anyhow::anyhow!(
                     "Invalid field filter format: '{}'. Expected 'field:pattern'",
                     field_spec
-                ))?;
+                )
+            })?;
 
             let field_trimmed = field.trim();
             let pattern_trimmed = pattern.trim();
@@ -187,23 +209,32 @@ impl CompiledFilters {
                 ));
             }
 
-            field_patterns.push((
-                field_trimmed.to_string(),
-                pattern_trimmed.to_lowercase()
-            ));
+            field_patterns.push((field_trimmed.to_string(), pattern_trimmed.to_lowercase()));
         }
 
         // Parse date filters
         let date_after = if let Some(date_str) = &args.date_after {
-            Some(NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                .with_context(|| format!("Invalid date format for --date-after: '{}'. Expected YYYY-MM-DD", date_str))?)
+            Some(
+                NaiveDate::parse_from_str(date_str, "%Y-%m-%d").with_context(|| {
+                    format!(
+                        "Invalid date format for --date-after: '{}'. Expected YYYY-MM-DD",
+                        date_str
+                    )
+                })?,
+            )
         } else {
             None
         };
 
         let date_before = if let Some(date_str) = &args.date_before {
-            Some(NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                .with_context(|| format!("Invalid date format for --date-before: '{}'. Expected YYYY-MM-DD", date_str))?)
+            Some(
+                NaiveDate::parse_from_str(date_str, "%Y-%m-%d").with_context(|| {
+                    format!(
+                        "Invalid date format for --date-before: '{}'. Expected YYYY-MM-DD",
+                        date_str
+                    )
+                })?,
+            )
         } else {
             None
         };
@@ -243,7 +274,9 @@ impl TagValue {
         let pattern_lower = pattern.to_lowercase();
         match self {
             TagValue::Single(tag) => tag.to_lowercase().contains(&pattern_lower),
-            TagValue::Array(tags) => tags.iter().any(|tag| tag.to_lowercase().contains(&pattern_lower)),
+            TagValue::Array(tags) => tags
+                .iter()
+                .any(|tag| tag.to_lowercase().contains(&pattern_lower)),
         }
     }
 }
@@ -264,9 +297,7 @@ fn yaml_value_contains(value: &serde_yaml::Value, pattern_lower: &str) -> bool {
 /// Helper function to parse a date from a YAML value
 fn parse_date_from_yaml_value(value: &serde_yaml::Value) -> Option<NaiveDate> {
     match value {
-        serde_yaml::Value::String(s) => {
-            NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
-        }
+        serde_yaml::Value::String(s) => NaiveDate::parse_from_str(s, "%Y-%m-%d").ok(),
         _ => None,
     }
 }
@@ -334,13 +365,16 @@ impl Metadata {
             // Count leading '#'
             let mut hashes = 0;
             for ch in trimmed.chars() {
-                if ch == '#' { hashes += 1; } else { break; }
+                if ch == '#' {
+                    hashes += 1;
+                } else {
+                    break;
+                }
             }
             if (1..=MAX_HEADING_LEVEL).contains(&hashes) {
                 // Expect a space after the hashes
                 let after = &trimmed[hashes..];
-                if after.starts_with(' ')
-                    && after.to_lowercase().contains(pattern_lower) {
+                if after.starts_with(' ') && after.to_lowercase().contains(pattern_lower) {
                     return true;
                 }
             }
@@ -417,7 +451,11 @@ impl Metadata {
     }
 
     /// Check if any date matches the date filters
-    fn matches_date_filters(&self, date_after: Option<NaiveDate>, date_before: Option<NaiveDate>) -> bool {
+    fn matches_date_filters(
+        &self,
+        date_after: Option<NaiveDate>,
+        date_before: Option<NaiveDate>,
+    ) -> bool {
         let dates = self.extract_dates();
 
         // If no dates found, don't match date filters
@@ -445,8 +483,8 @@ fn read_file_content(path: &Path, head_lines: usize, full_text: bool) -> Result<
     }
 
     // Open file with buffered reader for efficient line-by-line reading
-    let file = fs::File::open(path)
-        .with_context(|| format!("Failed to open file: {}", path.display()))?;
+    let file =
+        fs::File::open(path).with_context(|| format!("Failed to open file: {}", path.display()))?;
     let reader = BufReader::new(file);
 
     let mut lines_vec = Vec::new();
@@ -520,7 +558,11 @@ fn extract_frontmatter(content: &str, path: &Path) -> Option<Frontmatter> {
     match serde_yaml::from_str(&yaml_content) {
         Ok(fm) => Some(fm),
         Err(e) => {
-            eprintln!("Warning: Failed to parse YAML frontmatter in {}: {}", path.display(), e);
+            eprintln!(
+                "Warning: Failed to parse YAML frontmatter in {}: {}",
+                path.display(),
+                e
+            );
             None
         }
     }
@@ -540,15 +582,13 @@ fn matches_filename(path: &Path, regex: &Regex) -> bool {
 ///
 /// Applies all content-based filters (tags, titles, fields, dates) with AND logic between filter types
 /// and OR logic within each filter type (e.g., match any of the specified tags).
-fn should_include_file_by_content(
-    metadata: &Metadata,
-    filters: &CompiledFilters,
-) -> bool {
+fn should_include_file_by_content(metadata: &Metadata, filters: &CompiledFilters) -> bool {
     // Check tag filters (OR logic: match any tag)
     if !filters.tag_patterns.is_empty() {
-        let tag_matched = filters.tag_patterns.iter().any(|(pattern, regex)| {
-            metadata.has_tag(pattern, regex)
-        });
+        let tag_matched = filters
+            .tag_patterns
+            .iter()
+            .any(|(pattern, regex)| metadata.has_tag(pattern, regex));
         if !tag_matched {
             return false;
         }
@@ -556,9 +596,10 @@ fn should_include_file_by_content(
 
     // Check title filters
     if !filters.title_patterns.is_empty() {
-        let title_matched = filters.title_patterns.iter().any(|pattern| {
-            metadata.has_title(pattern)
-        });
+        let title_matched = filters
+            .title_patterns
+            .iter()
+            .any(|pattern| metadata.has_title(pattern));
         if !title_matched {
             return false;
         }
@@ -566,9 +607,10 @@ fn should_include_file_by_content(
 
     // Check field filters
     if !filters.field_patterns.is_empty() {
-        let field_matched = filters.field_patterns.iter().any(|(field, pattern)| {
-            metadata.has_field(field, pattern)
-        });
+        let field_matched = filters
+            .field_patterns
+            .iter()
+            .any(|(field, pattern)| metadata.has_field(field, pattern));
         if !field_matched {
             return false;
         }
@@ -576,7 +618,8 @@ fn should_include_file_by_content(
 
     // Check date filters (if any date filter is specified)
     if (filters.date_after.is_some() || filters.date_before.is_some())
-        && !metadata.matches_date_filters(filters.date_after, filters.date_before) {
+        && !metadata.matches_date_filters(filters.date_after, filters.date_before)
+    {
         return false;
     }
 
@@ -685,9 +728,10 @@ fn find_matching_files(args: &Args) -> Result<Vec<PathBuf>> {
     // Early filtering: check filename patterns first (no I/O required)
     if !filters.name_patterns.is_empty() {
         files.retain(|path| {
-            filters.name_patterns.iter().any(|regex| {
-                matches_filename(path, regex)
-            })
+            filters
+                .name_patterns
+                .iter()
+                .any(|regex| matches_filename(path, regex))
         });
     }
 

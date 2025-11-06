@@ -43,16 +43,14 @@ fn test_matches_date_filters_after() {
     };
 
     // Should match: date is after 2025-01-10
-    assert!(metadata.matches_date_filters(
-        Some(NaiveDate::from_ymd_opt(2025, 1, 10).unwrap()),
-        None
-    ));
+    assert!(
+        metadata.matches_date_filters(Some(NaiveDate::from_ymd_opt(2025, 1, 10).unwrap()), None)
+    );
 
     // Should not match: date is before 2025-01-20
-    assert!(!metadata.matches_date_filters(
-        Some(NaiveDate::from_ymd_opt(2025, 1, 20).unwrap()),
-        None
-    ));
+    assert!(
+        !metadata.matches_date_filters(Some(NaiveDate::from_ymd_opt(2025, 1, 20).unwrap()), None)
+    );
 }
 
 #[test]
@@ -66,16 +64,14 @@ fn test_matches_date_filters_before() {
     };
 
     // Should match: date is before 2025-01-20
-    assert!(metadata.matches_date_filters(
-        None,
-        Some(NaiveDate::from_ymd_opt(2025, 1, 20).unwrap())
-    ));
+    assert!(
+        metadata.matches_date_filters(None, Some(NaiveDate::from_ymd_opt(2025, 1, 20).unwrap()))
+    );
 
     // Should not match: date is after 2025-01-10
-    assert!(!metadata.matches_date_filters(
-        None,
-        Some(NaiveDate::from_ymd_opt(2025, 1, 10).unwrap())
-    ));
+    assert!(
+        !metadata.matches_date_filters(None, Some(NaiveDate::from_ymd_opt(2025, 1, 10).unwrap()))
+    );
 }
 
 #[test]
@@ -112,10 +108,7 @@ fn test_matches_date_filters_multiple_dates() {
     };
 
     // Should match: at least one date (created: 2025-01-05) is after 2025-01-01
-    assert!(metadata.matches_date_filters(
-        Some(NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()),
-        None
-    ));
+    assert!(metadata.matches_date_filters(Some(NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()), None));
 
     // Should match: at least one date (date: 2025-01-15) is in range
     assert!(metadata.matches_date_filters(
@@ -128,10 +121,7 @@ fn test_matches_date_filters_multiple_dates() {
 fn test_parse_date_from_yaml_value() {
     let date_value = serde_yaml::Value::String("2025-01-15".to_string());
     let date = parse_date_from_yaml_value(&date_value);
-    assert_eq!(
-        date,
-        Some(NaiveDate::from_ymd_opt(2025, 1, 15).unwrap())
-    );
+    assert_eq!(date, Some(NaiveDate::from_ymd_opt(2025, 1, 15).unwrap()));
 
     let invalid_value = serde_yaml::Value::String("invalid-date".to_string());
     let date = parse_date_from_yaml_value(&invalid_value);
