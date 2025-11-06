@@ -266,9 +266,6 @@ fmd -t archive | xargs tar -czf archive.tar.gz
 
 | Option | Description |
 |--------|-------------|
-| `-0` | NUL-delimited output (safe for filenames with spaces) |
-| `-i, --ignore-case` | Case-insensitive filename matching |
-| `-d, --depth N` | Limit search depth (1=current dir only) |
 | `-t, --tag TAG` | Filter by tag (case-insensitive) |
 | `-T, --title PAT` | Filter by title (case-insensitive, regex) |
 | `-a, --author PAT` | Filter by author (case-insensitive) |
@@ -277,8 +274,11 @@ fmd -t archive | xargs tar -czf archive.tar.gz
 | `--date-after DATE` | Filter files with dates on or after DATE (format: YYYY-MM-DD) |
 | `--date-before DATE` | Filter files with dates on or before DATE (format: YYYY-MM-DD) |
 | `--glob GLOB` | File pattern to match (default: `**/*.md`) |
+| `-d, --depth N` | Limit search depth (1=current dir only) |
 | `--head N` | Lines to scan for metadata (default: 10) |
 | `--full-text` | Search entire file content |
+| `-i, --ignore-case` | Case-insensitive matching for `--name` filter |
+| `-0` | NUL-delimited output (safe for filenames with spaces) |
 | `-v, --verbose` | Show verbose output including warnings and errors |
 | `-h, --help` | Show help message |
 

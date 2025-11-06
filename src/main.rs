@@ -67,17 +67,9 @@ const EXCLUDED_DIRS: &[&str] = &[
 #[command(name = "fmd")]
 #[command(about = "Find Markdown files by metadata - Search by tags, frontmatter, and custom fields", long_about = None)]
 struct Args {
-    /// Use NUL-delimited output (safe for xargs -0)
-    #[arg(short = '0', long)]
-    nul: bool,
-
-    /// Case-insensitive filename matching
-    #[arg(short = 'i', long = "ignore-case")]
-    ignore_case: bool,
-
-    /// Limit search depth (1=current dir only, default: unlimited)
-    #[arg(short = 'd', long = "depth")]
-    depth: Option<usize>,
+    /// Directories to search (default: current directory)
+    #[arg(default_value = ".")]
+    dirs: Vec<PathBuf>,
 
     /// Filter by tag (can be specified multiple times, OR logic)
     #[arg(short = 't', long = "tag")]
@@ -99,9 +91,21 @@ struct Args {
     #[arg(short = 'f', long = "field")]
     fields: Vec<String>,
 
+    /// Filter files with dates after this date (format: YYYY-MM-DD)
+    #[arg(long = "date-after")]
+    date_after: Option<String>,
+
+    /// Filter files with dates before this date (format: YYYY-MM-DD)
+    #[arg(long = "date-before")]
+    date_before: Option<String>,
+
     /// File pattern to match
     #[arg(long = "glob", default_value = "**/*.md")]
     glob: String,
+
+    /// Limit search depth (1=current dir only, default: unlimited)
+    #[arg(short = 'd', long = "depth")]
+    depth: Option<usize>,
 
     /// Lines to scan for metadata
     #[arg(long = "head", default_value_t = DEFAULT_HEAD_LINES)]
@@ -111,21 +115,17 @@ struct Args {
     #[arg(long = "full-text")]
     full_text: bool,
 
+    /// Case-insensitive matching for --name filter
+    #[arg(short = 'i', long = "ignore-case")]
+    ignore_case: bool,
+
+    /// Use NUL-delimited output (safe for xargs -0)
+    #[arg(short = '0', long)]
+    nul: bool,
+
     /// Show verbose output including warnings and errors
     #[arg(short = 'v', long = "verbose")]
     verbose: bool,
-
-    /// Filter files with dates after this date (format: YYYY-MM-DD)
-    #[arg(long = "date-after")]
-    date_after: Option<String>,
-
-    /// Filter files with dates before this date (format: YYYY-MM-DD)
-    #[arg(long = "date-before")]
-    date_before: Option<String>,
-
-    /// Directories to search (default: current directory)
-    #[arg(default_value = ".")]
-    dirs: Vec<PathBuf>,
 }
 
 /// Pre-compiled filters for efficient matching
