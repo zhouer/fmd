@@ -19,7 +19,7 @@ fmd --field "author:John"     # Find notes by John
 ## Features
 
 - **🗂 Metadata-aware** — Understands YAML frontmatter and inline `#tags`
-- **🔍 Flexible filtering** — By tag, title, filename, or any custom field
+- **🔍 Flexible filtering** — By tag, title, filename, date, or any custom field
 - **🧩 Unix-friendly** — Compose with `xargs`, `grep`, `fzf`
 - **🎯 Zero-config** — No database, no indexing required
 - **⚡ Fast** — Parallel processing with Rust
@@ -59,6 +59,11 @@ fmd -i -n readme             # Case-insensitive
 # Find by custom field
 fmd --field "author:John"
 fmd -f "status:draft"
+
+# Find by date range
+fmd --date-after 2025-01-01           # Files dated after Jan 1, 2025
+fmd --date-before 2025-12-31          # Files dated before Dec 31, 2025
+fmd --date-after 2025-01-01 --date-before 2025-03-31  # Q1 2025
 
 # Combine filters (AND logic across types)
 fmd -t work -T "meeting" -f "author:John"
@@ -107,6 +112,7 @@ date: 2025-01-15
 
 tags: #python #rust #cli
 author: John Doe
+date: 2025-01-15
 ```
 
 **Note:** By default, fmd scans the first 10 lines for inline metadata. Use `--full-text` to search the entire file.
@@ -157,9 +163,38 @@ fmd -f "author:John"
 # By status
 fmd -f "status:draft"
 
-# By date
+# By date (partial match)
 fmd -f "date:2025-01"
 ```
+
+### Search by Date Range
+
+Date filtering checks the `date`, `created`, `updated`, and `modified` fields. A file matches if **any** of these dates satisfies the filter.
+
+```bash
+# Files from 2025 onwards
+fmd --date-after 2025-01-01
+
+# Files before a specific date
+fmd --date-before 2025-06-30
+
+# Date range (Q1 2025)
+fmd --date-after 2025-01-01 --date-before 2025-03-31
+
+# Recent notes (last month)
+fmd --date-after 2025-10-01
+
+# Combine with other filters
+fmd -t work --date-after 2025-01-01  # Work notes from 2025
+```
+
+**Supported date fields** (checked in order):
+- `date:` — Primary date field
+- `created:` — Creation date
+- `updated:` — Last update date
+- `modified:` — Last modification date
+
+**Date format:** `YYYY-MM-DD` (ISO 8601)
 
 ### Combine Filters
 
@@ -218,9 +253,12 @@ fmd -t archive | xargs tar -czf archive.tar.gz
 | `-T, --title PAT` | Filter by title (case-insensitive, regex) |
 | `-n, --name PAT` | Filter by filename (regex) |
 | `-f, --field F:P` | Filter by frontmatter field (format: `field:pattern`) |
+| `--date-after DATE` | Filter files with dates on or after DATE (format: YYYY-MM-DD) |
+| `--date-before DATE` | Filter files with dates on or before DATE (format: YYYY-MM-DD) |
 | `--glob GLOB` | File pattern to match (default: `**/*.md`) |
 | `--head N` | Lines to scan for metadata (default: 10) |
 | `--full-text` | Search entire file content |
+| `-v, --verbose` | Show verbose output including warnings and errors |
 | `-h, --help` | Show help message |
 
 ---
@@ -278,14 +316,20 @@ fmd -d 1 -t linux | xargs -I {} mv {} ./topics/linux/
 # Edit all draft files
 fmd -f "status:draft" | xargs $EDITOR
 
-# Backup November files
-fmd -f "date:2025-11" | xargs -I {} cp {} ./backup/
+# Backup recent files (last 3 months)
+fmd --date-after 2025-08-01 | xargs -I {} cp {} ./backup/
+
+# Archive old notes (before 2024)
+fmd --date-before 2023-12-31 | xargs -I {} mv {} ./archive/
+
+# Find Q1 2025 work notes
+fmd -t work --date-after 2025-01-01 --date-before 2025-03-31
 
 # Find beginner tutorials
 fmd -f "category:tutorial" -f "difficulty:beginner"
 
-# Linux guides updated in 2025
-fmd -t linux -f "updated:2025" -T "guide"
+# Recent meeting notes
+fmd -T meeting --date-after 2025-10-01
 
 # Interactive selection
 fmd -t project | fzf --preview 'bat --color=always {}' | xargs $EDITOR

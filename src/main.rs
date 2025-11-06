@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::NaiveDate;
 use clap::Parser;
 use globset::Glob;
 use ignore::WalkBuilder;
@@ -87,6 +88,14 @@ struct Args {
     #[arg(short = 'v', long = "verbose")]
     verbose: bool,
 
+    /// Filter files with dates after this date (format: YYYY-MM-DD)
+    #[arg(long = "date-after")]
+    date_after: Option<String>,
+
+    /// Filter files with dates before this date (format: YYYY-MM-DD)
+    #[arg(long = "date-before")]
+    date_before: Option<String>,
+
     /// Directories to search (default: current directory)
     #[arg(default_value = ".")]
     dirs: Vec<PathBuf>,
@@ -105,6 +114,12 @@ struct CompiledFilters {
 
     /// Pre-parsed field filters (field_name, pattern_lowercase)
     field_patterns: Vec<(String, String)>,
+
+    /// Date filter: files with dates on or after this date
+    date_after: Option<NaiveDate>,
+
+    /// Date filter: files with dates on or before this date
+    date_before: Option<NaiveDate>,
 }
 
 impl CompiledFilters {
@@ -178,11 +193,28 @@ impl CompiledFilters {
             ));
         }
 
+        // Parse date filters
+        let date_after = if let Some(date_str) = &args.date_after {
+            Some(NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                .with_context(|| format!("Invalid date format for --date-after: '{}'. Expected YYYY-MM-DD", date_str))?)
+        } else {
+            None
+        };
+
+        let date_before = if let Some(date_str) = &args.date_before {
+            Some(NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                .with_context(|| format!("Invalid date format for --date-before: '{}'. Expected YYYY-MM-DD", date_str))?)
+        } else {
+            None
+        };
+
         Ok(CompiledFilters {
             tag_patterns,
             title_patterns,
             name_patterns,
             field_patterns,
+            date_after,
+            date_before,
         })
     }
 }
@@ -226,6 +258,16 @@ fn yaml_value_contains(value: &serde_yaml::Value, pattern_lower: &str) -> bool {
             seq.iter().any(|v| yaml_value_contains(v, pattern_lower))
         }
         _ => false,
+    }
+}
+
+/// Helper function to parse a date from a YAML value
+fn parse_date_from_yaml_value(value: &serde_yaml::Value) -> Option<NaiveDate> {
+    match value {
+        serde_yaml::Value::String(s) => {
+            NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
+        }
+        _ => None,
     }
 }
 
@@ -335,6 +377,62 @@ impl Metadata {
 
         false
     }
+
+    /// Extract dates from the frontmatter or content.
+    /// Checks for date, created, updated, modified fields.
+    /// Returns a list of all valid dates found (deduplicated).
+    fn extract_dates(&self) -> Vec<NaiveDate> {
+        let mut dates = Vec::new();
+        let date_fields = ["date", "created", "updated", "modified"];
+
+        // Check YAML frontmatter first
+        if let Some(ref fm) = self.frontmatter {
+            for field_name in &date_fields {
+                if let Some(value) = fm.extra.get(*field_name) {
+                    if let Some(date) = parse_date_from_yaml_value(value) {
+                        dates.push(date);
+                    }
+                }
+            }
+        } else {
+            // Only check inline format if no frontmatter exists
+            // to avoid duplicates
+            for line in self.raw_content.lines() {
+                let trimmed = line.trim_start();
+                if let Some(colon_pos) = trimmed.find(':') {
+                    let key = &trimmed[..colon_pos].trim();
+                    if date_fields.iter().any(|f| key.eq_ignore_ascii_case(f)) {
+                        let value = &trimmed[colon_pos + 1..].trim();
+                        if let Ok(date) = NaiveDate::parse_from_str(value, "%Y-%m-%d") {
+                            dates.push(date);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Deduplicate dates
+        dates.sort();
+        dates.dedup();
+        dates
+    }
+
+    /// Check if any date matches the date filters
+    fn matches_date_filters(&self, date_after: Option<NaiveDate>, date_before: Option<NaiveDate>) -> bool {
+        let dates = self.extract_dates();
+
+        // If no dates found, don't match date filters
+        if dates.is_empty() {
+            return false;
+        }
+
+        // Check if ANY date satisfies the filters
+        dates.iter().any(|date| {
+            let after_check = date_after.map_or(true, |after| date >= &after);
+            let before_check = date_before.map_or(true, |before| date <= &before);
+            after_check && before_check
+        })
+    }
 }
 
 /// Read file content efficiently based on mode
@@ -441,7 +539,7 @@ fn matches_filename(path: &Path, regex: &Regex) -> bool {
 
 /// Determines if a file should be included based on its content metadata.
 ///
-/// Applies all content-based filters (tags, titles, fields) with AND logic between filter types
+/// Applies all content-based filters (tags, titles, fields, dates) with AND logic between filter types
 /// and OR logic within each filter type (e.g., match any of the specified tags).
 fn should_include_file_by_content(
     metadata: &Metadata,
@@ -473,6 +571,13 @@ fn should_include_file_by_content(
             metadata.has_field(field, pattern)
         });
         if !field_matched {
+            return false;
+        }
+    }
+
+    // Check date filters (if any date filter is specified)
+    if filters.date_after.is_some() || filters.date_before.is_some() {
+        if !metadata.matches_date_filters(filters.date_after, filters.date_before) {
             return false;
         }
     }
@@ -569,6 +674,8 @@ fn find_matching_files(args: &Args) -> Result<Vec<PathBuf>> {
         && args.titles.is_empty()
         && args.names.is_empty()
         && args.fields.is_empty()
+        && args.date_after.is_none()
+        && args.date_before.is_none()
     {
         files.sort();
         return Ok(files);
@@ -627,342 +734,4 @@ fn main() -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_frontmatter_valid() {
-        let content = "---\ntitle: Test\ntags: [rust, cli]\n---\n# Content";
-        let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path);
-
-        assert!(fm.is_some());
-        let fm = fm.unwrap();
-        assert_eq!(fm.title, Some("Test".to_string()));
-    }
-
-    #[test]
-    fn test_extract_frontmatter_empty() {
-        let content = "---\n---\n# Content";
-        let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path);
-
-        assert!(fm.is_none());
-    }
-
-    #[test]
-    fn test_extract_frontmatter_none() {
-        let content = "# Just a heading";
-        let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path);
-
-        assert!(fm.is_none());
-    }
-
-    #[test]
-    fn test_extract_frontmatter_multiline_tags() {
-        let content = "---\ntags:\n  - rust\n  - cli\n---\n# Content";
-        let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path);
-
-        assert!(fm.is_some());
-        let fm = fm.unwrap();
-        if let Some(TagValue::Array(tags)) = fm.tags {
-            assert_eq!(tags.len(), 2);
-            assert!(tags.contains(&"rust".to_string()));
-            assert!(tags.contains(&"cli".to_string()));
-        } else {
-            panic!("Expected array of tags");
-        }
-    }
-
-    #[test]
-    fn test_tag_value_contains_tag() {
-        let single = TagValue::Single("rust".to_string());
-        assert!(single.contains_tag("rust"));
-        assert!(single.contains_tag("RUST")); // case insensitive
-        assert!(!single.contains_tag("python"));
-
-        let array = TagValue::Array(vec!["rust".to_string(), "cli".to_string()]);
-        assert!(array.contains_tag("rust"));
-        assert!(array.contains_tag("CLI")); // case insensitive
-        assert!(!array.contains_tag("python"));
-    }
-
-    #[test]
-    fn test_compiled_filters_tag_regex() {
-        let args = Args {
-            tags: vec!["rust".to_string(), "python".to_string()],
-            titles: vec![],
-            names: vec![],
-            fields: vec![],
-            nul: false,
-            ignore_case: false,
-            depth: None,
-            glob: "**/*.md".to_string(),
-            head_lines: 10,
-            full_text: false,
-            verbose: false,
-            dirs: vec![PathBuf::from(".")],
-        };
-
-        let filters = CompiledFilters::from_args(&args).unwrap();
-        assert_eq!(filters.tag_patterns.len(), 2);
-
-        // Check that regex matches work
-        let (pattern, regex) = &filters.tag_patterns[0];
-        assert_eq!(pattern, "rust");
-        assert!(regex.is_match("#rust"));
-        assert!(regex.is_match("#RUST")); // case insensitive
-        assert!(!regex.is_match("#rust123")); // word boundary
-    }
-
-    #[test]
-    fn test_compiled_filters_invalid_regex_returns_error() {
-        let args = Args {
-            tags: vec![],
-            titles: vec![],
-            names: vec!["[invalid".to_string()], // Invalid regex
-            fields: vec![],
-            nul: false,
-            ignore_case: false,
-            depth: None,
-            glob: "**/*.md".to_string(),
-            head_lines: 10,
-            full_text: false,
-            verbose: false,
-            dirs: vec![PathBuf::from(".")],
-        };
-
-        let result = CompiledFilters::from_args(&args);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_compiled_filters_empty_field_name() {
-        let args = Args {
-            tags: vec![],
-            titles: vec![],
-            names: vec![],
-            fields: vec![":pattern".to_string()], // Empty field name
-            nul: false,
-            ignore_case: false,
-            depth: None,
-            glob: "**/*.md".to_string(),
-            head_lines: 10,
-            full_text: false,
-            verbose: false,
-            dirs: vec![PathBuf::from(".")],
-        };
-
-        let result = CompiledFilters::from_args(&args);
-        assert!(result.is_err());
-        if let Err(e) = result {
-            assert!(e.to_string().contains("Field name cannot be empty"));
-        }
-    }
-
-    #[test]
-    fn test_compiled_filters_empty_pattern() {
-        let args = Args {
-            tags: vec![],
-            titles: vec![],
-            names: vec![],
-            fields: vec!["field:".to_string()], // Empty pattern
-            nul: false,
-            ignore_case: false,
-            depth: None,
-            glob: "**/*.md".to_string(),
-            head_lines: 10,
-            full_text: false,
-            verbose: false,
-            dirs: vec![PathBuf::from(".")],
-        };
-
-        let result = CompiledFilters::from_args(&args);
-        assert!(result.is_err());
-        if let Err(e) = result {
-            assert!(e.to_string().contains("Pattern cannot be empty"));
-        }
-    }
-
-    #[test]
-    fn test_compiled_filters_empty_field_and_pattern() {
-        let args = Args {
-            tags: vec![],
-            titles: vec![],
-            names: vec![],
-            fields: vec![":".to_string()], // Both empty
-            nul: false,
-            ignore_case: false,
-            depth: None,
-            glob: "**/*.md".to_string(),
-            head_lines: 10,
-            full_text: false,
-            verbose: false,
-            dirs: vec![PathBuf::from(".")],
-        };
-
-        let result = CompiledFilters::from_args(&args);
-        assert!(result.is_err());
-        if let Err(e) = result {
-            assert!(e.to_string().contains("Both field and pattern cannot be empty"));
-        }
-    }
-
-    #[test]
-    fn test_compiled_filters_whitespace_only_field() {
-        let args = Args {
-            tags: vec![],
-            titles: vec![],
-            names: vec![],
-            fields: vec!["  :pattern".to_string()], // Whitespace-only field
-            nul: false,
-            ignore_case: false,
-            depth: None,
-            glob: "**/*.md".to_string(),
-            head_lines: 10,
-            full_text: false,
-            verbose: false,
-            dirs: vec![PathBuf::from(".")],
-        };
-
-        let result = CompiledFilters::from_args(&args);
-        assert!(result.is_err());
-        if let Err(e) = result {
-            assert!(e.to_string().contains("Field name cannot be empty"));
-        }
-    }
-
-    #[test]
-    fn test_metadata_has_tag_yaml() {
-        let content = "---\ntags: [rust, cli]\n---\n# Content";
-        let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path);
-        let metadata = Metadata {
-            frontmatter: fm,
-            raw_content: content.to_string(),
-        };
-
-        let (pattern, regex) = ("rust".to_string(),
-            regex::RegexBuilder::new(r"(^|[^[:word:]])#rust([^[:word:]]|$)")
-                .case_insensitive(true)
-                .build()
-                .unwrap());
-
-        assert!(metadata.has_tag(&pattern, &regex));
-    }
-
-    #[test]
-    fn test_metadata_has_tag_inline() {
-        let content = "# Title\n\ntags: #rust #cli";
-        let metadata = Metadata {
-            frontmatter: None,
-            raw_content: content.to_string(),
-        };
-
-        let (pattern, regex) = ("rust".to_string(),
-            regex::RegexBuilder::new(r"(^|[^[:word:]])#rust([^[:word:]]|$)")
-                .case_insensitive(true)
-                .build()
-                .unwrap());
-
-        assert!(metadata.has_tag(&pattern, &regex));
-    }
-
-    #[test]
-    fn test_metadata_has_title_yaml() {
-        let content = "---\ntitle: Meeting Notes\n---\n# Content";
-        let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path);
-        let metadata = Metadata {
-            frontmatter: fm,
-            raw_content: content.to_string(),
-        };
-
-        assert!(metadata.has_title("meeting"));
-        assert!(!metadata.has_title("other"));
-    }
-
-    #[test]
-    fn test_metadata_has_title_markdown() {
-        let content = "# Meeting Notes 2025\n\nContent here";
-        let metadata = Metadata {
-            frontmatter: None,
-            raw_content: content.to_string(),
-        };
-
-        assert!(metadata.has_title("meeting"));
-        assert!(metadata.has_title("2025"));
-        assert!(!metadata.has_title("other"));
-    }
-
-    #[test]
-    fn test_metadata_has_field() {
-        let content = "---\nauthor: John Doe\nstatus: draft\n---\n# Content";
-        let path = PathBuf::from("test.md");
-        let fm = extract_frontmatter(content, &path);
-        let metadata = Metadata {
-            frontmatter: fm,
-            raw_content: content.to_string(),
-        };
-
-        assert!(metadata.has_field("author", "john"));
-        assert!(metadata.has_field("status", "draft"));
-        assert!(!metadata.has_field("author", "jane"));
-    }
-
-    #[test]
-    fn test_matches_filename_with_regex() {
-        let regex = regex::RegexBuilder::new("2025")
-            .case_insensitive(false)
-            .build()
-            .unwrap();
-
-        let path1 = PathBuf::from("notes-2025-01.md");
-        let path2 = PathBuf::from("notes-2024.md");
-
-        assert!(matches_filename(&path1, &regex));
-        assert!(!matches_filename(&path2, &regex));
-    }
-
-    #[test]
-    fn test_read_file_content_respects_head_lines() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "Line 1").unwrap();
-        writeln!(temp_file, "Line 2").unwrap();
-        writeln!(temp_file, "Line 3").unwrap();
-        writeln!(temp_file, "Line 4").unwrap();
-        writeln!(temp_file, "Line 5").unwrap();
-        temp_file.flush().unwrap();
-
-        let content = read_file_content(temp_file.path(), 3, false).unwrap();
-        let lines: Vec<&str> = content.lines().collect();
-
-        assert_eq!(lines.len(), 3);
-        assert_eq!(lines[0], "Line 1");
-        assert_eq!(lines[2], "Line 3");
-    }
-
-    #[test]
-    fn test_read_file_content_full_text() {
-        use std::io::Write;
-        use tempfile::NamedTempFile;
-
-        let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, "Line 1").unwrap();
-        writeln!(temp_file, "Line 2").unwrap();
-        writeln!(temp_file, "Line 3").unwrap();
-        writeln!(temp_file, "Line 4").unwrap();
-        writeln!(temp_file, "Line 5").unwrap();
-        temp_file.flush().unwrap();
-
-        let content = read_file_content(temp_file.path(), 3, true).unwrap();
-        let lines: Vec<&str> = content.lines().collect();
-
-        assert_eq!(lines.len(), 5);
-    }
-}
+mod tests;

@@ -6,38 +6,7 @@ This document outlines planned features and improvements for fmd.
 
 ## Planned Features
 
-### 1. Date Filtering ⭐⭐⭐⭐⭐
-**Status**: TBD
-**Impact**: High - Essential for note management
-**Complexity**: Medium
-
-#### Proposed API
-```bash
-# Filter by date range
-fmd --date-after 2025-01-01
-fmd --date-before 2025-12-31
-fmd --date-after 2025-01-01 --date-before 2025-03-31
-
-# Relative dates
-fmd --date-after "7 days ago"
-fmd --date-after "last week"
-fmd --date-after "this month"
-
-# Modified time (using file system metadata)
-fmd --modified-after 2025-01-01
-fmd --modified-within "7 days"
-```
-
-#### Implementation Notes
-- Add `chrono` dependency for date parsing
-- Support both ISO 8601 format and natural language
-- Read `date` field from YAML frontmatter
-- Fall back to file modification time if no frontmatter date
-- Support comparison operators: `after`, `before`, `within`
-
----
-
-### 2. Sorting Options ⭐⭐⭐⭐
+### 1. Sorting Options ⭐⭐⭐⭐
 **Status**: TBD
 **Impact**: High - Improves usability
 **Complexity**: Low
@@ -63,7 +32,7 @@ fmd -t Work --sort date --reverse
 
 ---
 
-### 3. Interactive Mode ⭐⭐⭐⭐
+### 2. Interactive Mode ⭐⭐⭐⭐
 **Status**: TBD
 **Impact**: Medium
 **Complexity**: Medium-High
@@ -89,7 +58,7 @@ fmd --fzf --preview
 
 ---
 
-### 4. Content Search ⭐⭐⭐
+### 3. Content Search ⭐⭐⭐
 **Status**: TBD
 **Impact**: Medium
 **Complexity**: Medium
@@ -114,7 +83,7 @@ fmd --content "Docker" --show-context 3
 
 ---
 
-### 5. Exclusion Filters (NOT logic) ⭐⭐⭐
+### 4. Exclusion Filters (NOT logic) ⭐⭐⭐
 **Status**: TBD
 **Impact**: Medium
 **Complexity**: Low
@@ -138,7 +107,7 @@ fmd --exclude-dir ".git" --exclude-dir "archive"
 
 ---
 
-### 6. Configuration File ⭐⭐⭐
+### 5. Configuration File ⭐⭐⭐
 **Status**: TBD
 **Impact**: Medium
 **Complexity**: Low
@@ -174,7 +143,7 @@ recent = ["--modified-within", "7 days"]
 
 ---
 
-### 7. Advanced Regex Support ⭐⭐⭐
+### 6. Advanced Regex Support ⭐⭐⭐
 **Status**: Future
 **Impact**: Medium
 **Complexity**: Low
@@ -196,7 +165,7 @@ fmd -n "^2025-\d{2}-\d{2}\.md$"
 
 ---
 
-### 8. Output Format Options ⭐⭐
+### 7. Output Format Options ⭐⭐
 **Status**: TBD
 **Impact**: Medium - Better integration with other tools
 **Complexity**: Medium
@@ -245,7 +214,7 @@ notes/report.md         Q4 Report        finance,work 2025-11-03
 
 ---
 
-### 9. Natural Language Query ⭐
+### 8. Natural Language Query ⭐
 **Status**: Experimental
 **Impact**: High (if done well)
 **Complexity**: Very High
