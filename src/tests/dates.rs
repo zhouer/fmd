@@ -165,7 +165,8 @@ fn test_date_filter_args_parsing() {
 
 #[test]
 fn test_date_filter_invalid_format() {
-    let args = Args {
+    // Test invalid date_after format
+    let args_after = Args {
         tags: vec![],
         titles: vec![],
         authors: vec![],
@@ -183,7 +184,59 @@ fn test_date_filter_invalid_format() {
         dirs: vec![PathBuf::from(".")],
     };
 
-    let result = CompiledFilters::from_args(&args);
+    let result = CompiledFilters::from_args(&args_after);
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(e.to_string().contains("Invalid date format"));
+        assert!(e.to_string().contains("date-after"));
+    }
+
+    // Test invalid date_before format
+    let args_before = Args {
+        tags: vec![],
+        titles: vec![],
+        authors: vec![],
+        names: vec![],
+        fields: vec![],
+        nul: false,
+        ignore_case: false,
+        depth: None,
+        glob: "**/*.md".to_string(),
+        head_lines: 10,
+        full_text: false,
+        verbose: false,
+        date_after: None,
+        date_before: Some("invalid-date".to_string()), // Invalid format
+        dirs: vec![PathBuf::from(".")],
+    };
+
+    let result = CompiledFilters::from_args(&args_before);
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(e.to_string().contains("Invalid date format"));
+        assert!(e.to_string().contains("date-before"));
+    }
+
+    // Test empty date_before
+    let args_empty = Args {
+        tags: vec![],
+        titles: vec![],
+        authors: vec![],
+        names: vec![],
+        fields: vec![],
+        nul: false,
+        ignore_case: false,
+        depth: None,
+        glob: "**/*.md".to_string(),
+        head_lines: 10,
+        full_text: false,
+        verbose: false,
+        date_after: None,
+        date_before: Some("".to_string()), // Empty
+        dirs: vec![PathBuf::from(".")],
+    };
+
+    let result = CompiledFilters::from_args(&args_empty);
     assert!(result.is_err());
     if let Err(e) = result {
         assert!(e.to_string().contains("Invalid date format"));

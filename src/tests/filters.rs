@@ -64,6 +64,9 @@ fn test_compiled_filters_field_validation_errors() {
         ("field:", "Pattern cannot be empty"),
         (":", "Both field and pattern cannot be empty"),
         ("  :pattern", "Field name cannot be empty"),
+        ("nocolon", "Expected 'field:pattern'"),
+        ("invalidformat", "Expected 'field:pattern'"),
+        ("", "Expected 'field:pattern'"),
     ];
 
     for (field_input, expected_error) in test_cases {

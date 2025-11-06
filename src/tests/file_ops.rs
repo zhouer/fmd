@@ -261,3 +261,23 @@ fn test_read_file_content_consecutive_newlines() {
     assert!(content.contains("Line 1"));
     assert!(content.contains("Line 4"));
 }
+
+#[test]
+fn test_read_file_content_excessive_frontmatter() {
+    let mut temp_file = NamedTempFile::new().unwrap();
+    // Create frontmatter with more than 1000 lines (MAX_FRONTMATTER_LINES)
+    writeln!(temp_file, "---").unwrap();
+    for i in 0..1001 {
+        writeln!(temp_file, "field{}: value{}", i, i).unwrap();
+    }
+    writeln!(temp_file, "---").unwrap();
+    writeln!(temp_file, "Content after frontmatter").unwrap();
+    temp_file.flush().unwrap();
+
+    let result = read_file_content(temp_file.path(), 10, false);
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(e.to_string().contains("exceeds maximum size"));
+        assert!(e.to_string().contains("1000"));
+    }
+}

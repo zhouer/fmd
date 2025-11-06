@@ -417,3 +417,37 @@ fn test_metadata_no_frontmatter_no_title() {
 
     assert!(!metadata.has_title("content"));
 }
+
+#[test]
+fn test_matches_filename_no_filename() {
+    let regex = regex::RegexBuilder::new("test")
+        .case_insensitive(false)
+        .build()
+        .unwrap();
+
+    // Test paths that have no filename component
+    let root_path = PathBuf::from("/");
+    assert!(!matches_filename(&root_path, &regex));
+
+    // Test empty path
+    let empty_path = PathBuf::from("");
+    assert!(!matches_filename(&empty_path, &regex));
+}
+
+#[test]
+fn test_matches_filename_parent_directory() {
+    let regex = regex::RegexBuilder::new("test")
+        .case_insensitive(false)
+        .build()
+        .unwrap();
+
+    // Parent directory reference should not match
+    let parent_path = PathBuf::from("..");
+    // ".." has a filename component ("..")
+    // This test verifies the behavior
+    assert!(!matches_filename(&parent_path, &regex));
+
+    // Current directory
+    let current_path = PathBuf::from(".");
+    assert!(!matches_filename(&current_path, &regex));
+}

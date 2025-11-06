@@ -2,6 +2,7 @@
 //
 // This module organizes unit tests into separate files by functionality
 
+mod application;
 mod author;
 mod content_filtering;
 mod dates;
