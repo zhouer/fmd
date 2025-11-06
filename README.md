@@ -109,9 +109,9 @@ date: 2025-01-15
 ```markdown
 # My Document
 
-tags: #python #rust #cli
 author: John Doe
 date: 2025-01-15
+tags: #python #rust #cli
 ```
 
 **Note:** By default, fmd scans the first 10 lines for inline metadata. Use `--full-text` to search the entire file.
@@ -275,6 +275,11 @@ fmd -t project --full-text     # Anywhere in content
 ## Usage with Unix Tools
 
 fmd is designed to work seamlessly with standard Unix tools. Here are practical examples:
+
+**Note:** When filenames contain spaces, use the `-0` option with `xargs -0` for safe processing:
+```bash
+fmd -0 -t project | xargs -0 command
+```
 
 ### Search and Edit
 
