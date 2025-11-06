@@ -216,28 +216,6 @@ fmd -t work --date-after 2025-01-01  # Work notes from 2025
 
 **Date format:** `YYYY-MM-DD` (ISO 8601)
 
-### Compose with Unix Tools
-
-```bash
-# Search file contents
-fmd -t finance | xargs grep -l "Apple"
-
-# Edit all drafts
-fmd -f "status:draft" | xargs $EDITOR
-
-# Count files
-fmd -t todo | wc -l
-
-# Interactive selection with fzf
-fmd | fzf --preview 'bat {}' | xargs $EDITOR
-
-# Move files (safe with spaces)
-fmd -0 -t linux | xargs -0 -I {} mv {} ./topics/linux/
-
-# Create archive
-fmd -t archive | xargs tar -czf archive.tar.gz
-```
-
 ---
 
 ## Command-Line Options
@@ -303,23 +281,50 @@ fmd -t project --full-text     # Anywhere in content
 
 ---
 
-## Advanced Examples
+## Usage with Unix Tools
+
+fmd is designed to work seamlessly with standard Unix tools. Here are practical examples:
+
+### Search and Edit
 
 ```bash
-# Find finance notes mentioning Apple
+# Search file contents
 fmd -t finance | xargs grep -l "Apple"
-
-# Move all linux notes from current directory
-fmd -d 1 -t linux | xargs -I {} mv {} ./topics/linux/
 
 # Edit all draft files
 fmd -f "status:draft" | xargs $EDITOR
+
+# Interactive selection with fzf
+fmd -t project | fzf --preview 'bat --color=always {}' | xargs $EDITOR
+```
+
+### File Management
+
+```bash
+# Move files (safe with spaces using -0)
+fmd -0 -t linux | xargs -0 -I {} mv {} ./topics/linux/
+
+# Move files from current directory only
+fmd -d 1 -t linux | xargs -I {} mv {} ./topics/linux/
 
 # Backup recent files (last 3 months)
 fmd --date-after 2025-08-01 | xargs -I {} cp {} ./backup/
 
 # Archive old notes (before 2024)
 fmd --date-before 2023-12-31 | xargs -I {} mv {} ./archive/
+
+# Create tar archive
+fmd -t archive | xargs tar -czf archive.tar.gz
+```
+
+### Analysis and Reporting
+
+```bash
+# Count files by tag
+fmd -t todo | wc -l
+
+# List file details (safe with spaces)
+fmd -0 -t important | xargs -0 ls -lh
 
 # Find Q1 2025 work notes
 fmd -t work --date-after 2025-01-01 --date-before 2025-03-31
@@ -329,12 +334,6 @@ fmd -f "category:tutorial" -f "difficulty:beginner"
 
 # Recent meeting notes
 fmd -T meeting --date-after 2025-10-01
-
-# Interactive selection
-fmd -t project | fzf --preview 'bat --color=always {}' | xargs $EDITOR
-
-# Safe handling of filenames with spaces
-fmd -0 -t important | xargs -0 ls -lh
 ```
 
 ---
