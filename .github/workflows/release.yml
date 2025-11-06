@@ -12,50 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          body: |
-            ## Changes in this release
-
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.
-
-            ## Installation
-
-            ### From binary
-
-            Download the appropriate binary for your platform below and place it in your PATH.
-
-            ### From source
-
-            ```bash
-            cargo install fmd
-            ```
-
-            ## Checksums
-
-            SHA256 checksums are provided for all binaries.
-
   build-release:
     name: Build Release
-    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -104,6 +62,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -116,6 +76,8 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} --verbose
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Strip binary (Linux and macOS)
         if: matrix.os != 'windows-latest'
@@ -135,11 +97,46 @@ jobs:
           certutil -hashfile ${{ matrix.artifact_name }} SHA256 > ${{ matrix.asset_name }}.sha256
           type ${{ matrix.asset_name }}.sha256
 
+      - name: Rename binary for upload
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          cp ${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+
+      - name: Rename binary for upload (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          copy ${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: |
+            ## Changes in this release
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.
+
+            ## Installation
+
+            ### From binary
+
+            Download the appropriate binary for your platform below and place it in your PATH.
+
+            ### From source
+
+            ```bash
+            cargo install fmd
+            ```
+
+            ## Checksums
+
+            SHA256 checksums are provided for all binaries.
           files: |
-            ./target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+            ./target/${{ matrix.target }}/release/${{ matrix.asset_name }}
             ./target/${{ matrix.target }}/release/${{ matrix.asset_name }}.sha256
 
   publish-crates-io:
