@@ -10,7 +10,12 @@ fn has_author_yaml_comprehensive() {
 author: John Doe
 ---
 Some content here."#,
-            vec![("john doe", true), ("john", true), ("doe", true), ("bob", false)],
+            vec![
+                ("john doe", true),
+                ("john", true),
+                ("doe", true),
+                ("bob", false),
+            ],
         ),
         (
             r#"---
@@ -19,8 +24,8 @@ author: Jane Smith
 Content"#,
             vec![
                 ("jane", true),
-                ("jane", true),  // case insensitive
-                ("jane smith", true),  // case insensitive
+                ("jane", true),       // case insensitive
+                ("jane smith", true), // case insensitive
                 ("smith", true),
                 ("xyz", false),
             ],
@@ -70,9 +75,9 @@ Author: Carol Williams
 Last line"#,
             vec![
                 ("carol", true),
-                ("carol", true),  // case insensitive
+                ("carol", true), // case insensitive
                 ("williams", true),
-                ("williams", true),  // case insensitive
+                ("williams", true), // case insensitive
             ],
         ),
         (

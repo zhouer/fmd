@@ -78,7 +78,11 @@ fn enumerate_files_depth_limits() {
 
     fs::write(temp_path.join("root.md"), "content").unwrap();
     fs::write(temp_path.join("level1").join("l1.md"), "content").unwrap();
-    fs::write(temp_path.join("level1").join("level2").join("l2.md"), "content").unwrap();
+    fs::write(
+        temp_path.join("level1").join("level2").join("l2.md"),
+        "content",
+    )
+    .unwrap();
 
     // Test depth=2 (root + 1 level)
     let args = create_test_args(vec![temp_path.clone()], "**/*.md".to_string(), Some(2));
@@ -99,7 +103,12 @@ fn enumerate_files_depth_limits() {
 fn enumerate_files_excluded_directories() {
     // Test that all common build/cache directories are excluded
     let excluded_dirs = vec![
-        "target", "node_modules", "build", "__pycache__", "dist", ".cache"
+        "target",
+        "node_modules",
+        "build",
+        "__pycache__",
+        "dist",
+        ".cache",
     ];
 
     for excluded_dir in excluded_dirs {
@@ -114,7 +123,9 @@ fn enumerate_files_excluded_directories() {
         let files = enumerate_files(&args).unwrap();
         assert_eq!(files.len(), 1, "Failed for directory: {}", excluded_dir);
         assert!(files.iter().any(|f| f.file_name().unwrap() == "normal.md"));
-        assert!(!files.iter().any(|f| f.file_name().unwrap() == "excluded.md"));
+        assert!(!files
+            .iter()
+            .any(|f| f.file_name().unwrap() == "excluded.md"));
     }
 }
 
@@ -126,7 +137,11 @@ fn enumerate_files_multiple_directories() {
     fs::write(temp_path1.join("file1.md"), "content").unwrap();
     fs::write(temp_path2.join("file2.md"), "content").unwrap();
 
-    let args = create_test_args(vec![temp_path1.clone(), temp_path2.clone()], "*.md".to_string(), None);
+    let args = create_test_args(
+        vec![temp_path1.clone(), temp_path2.clone()],
+        "*.md".to_string(),
+        None,
+    );
 
     let files = enumerate_files(&args).unwrap();
     assert_eq!(files.len(), 2);
@@ -146,7 +161,9 @@ fn enumerate_files_custom_glob_pattern() {
 
     let files = enumerate_files(&args).unwrap();
     assert_eq!(files.len(), 1);
-    assert!(files.iter().any(|f| f.file_name().unwrap() == "note.markdown"));
+    assert!(files
+        .iter()
+        .any(|f| f.file_name().unwrap() == "note.markdown"));
 }
 
 #[test]
@@ -174,7 +191,10 @@ fn enumerate_files_invalid_glob_pattern() {
 
     let result = enumerate_files(&args);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid glob pattern"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid glob pattern"));
 }
 
 #[test]

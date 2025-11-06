@@ -11,7 +11,7 @@ fn yaml_value_string_positive_cases() {
                 ("hello", true),
                 ("world", true),
                 ("hello world", true),
-                ("hello", true),  // case insensitive
+                ("hello", true), // case insensitive
                 ("goodbye", false),
             ],
         ),
@@ -25,11 +25,7 @@ fn yaml_value_string_positive_cases() {
         ),
         (
             Value::String("hello-world_test!@#".to_string()),
-            vec![
-                ("hello-world", true),
-                ("world_test", true),
-                ("!@#", true),
-            ],
+            vec![("hello-world", true), ("world_test", true), ("!@#", true)],
         ),
     ];
 
@@ -97,7 +93,7 @@ fn yaml_value_boolean_types() {
             vec![
                 ("true", true),
                 ("tru", true),
-                ("true", true),  // case insensitive
+                ("true", true), // case insensitive
                 ("false", false),
             ],
         ),
@@ -106,7 +102,7 @@ fn yaml_value_boolean_types() {
             vec![
                 ("false", true),
                 ("fal", true),
-                ("false", true),  // case insensitive
+                ("false", true), // case insensitive
                 ("true", false),
             ],
         ),
@@ -137,8 +133,8 @@ fn yaml_value_sequence_positive_cases() {
             ]),
             vec![
                 ("rust", true),
-                ("python", true),  // case insensitive
-                ("python", true),  // case insensitive
+                ("python", true), // case insensitive
+                ("python", true), // case insensitive
             ],
         ),
         (

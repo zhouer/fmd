@@ -25,7 +25,10 @@ fn run_fmd(args: &[&str], dir: &TempDir) -> String {
 
 #[test]
 fn test_list_all_markdown_files() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
     create_test_file(&temp_dir, "file1.md", "# Hello");
     create_test_file(&temp_dir, "file2.md", "# World");
     create_test_file(&temp_dir, "file3.txt", "Not markdown");
@@ -39,7 +42,10 @@ fn test_list_all_markdown_files() {
 
 #[test]
 fn test_filter_by_yaml_tag() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -60,7 +66,10 @@ fn test_filter_by_yaml_tag() {
 
 #[test]
 fn test_filter_by_inline_tag() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -81,7 +90,10 @@ fn test_filter_by_inline_tag() {
 
 #[test]
 fn test_filter_by_yaml_title() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -102,7 +114,10 @@ fn test_filter_by_yaml_title() {
 
 #[test]
 fn test_filter_by_markdown_heading() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "meeting.md", "# Meeting Notes 2025");
     create_test_file(&temp_dir, "other.md", "# Other Document");
@@ -115,7 +130,10 @@ fn test_filter_by_markdown_heading() {
 
 #[test]
 fn test_filter_by_filename() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "2025-01-notes.md", "# Content");
     create_test_file(&temp_dir, "2024-12-notes.md", "# Content");
@@ -128,7 +146,10 @@ fn test_filter_by_filename() {
 
 #[test]
 fn test_filter_by_custom_field() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -149,7 +170,10 @@ fn test_filter_by_custom_field() {
 
 #[test]
 fn test_combined_filters_and_logic() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -176,7 +200,10 @@ fn test_combined_filters_and_logic() {
 
 #[test]
 fn test_multiple_tags_or_logic() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "rust.md", "---\ntags: [rust]\n---\n# Content");
     create_test_file(
@@ -195,7 +222,10 @@ fn test_multiple_tags_or_logic() {
 
 #[test]
 fn test_case_insensitive_filename() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "README.md", "# Content");
     create_test_file(&temp_dir, "notes.md", "# Content");
@@ -208,7 +238,10 @@ fn test_case_insensitive_filename() {
 
 #[test]
 fn test_nul_delimited_output() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "file1.md", "# Content");
     create_test_file(&temp_dir, "file2.md", "# Content");
@@ -225,7 +258,10 @@ fn test_nul_delimited_output() {
 
 #[test]
 fn test_empty_frontmatter() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "empty_fm.md", "---\n---\n# Content");
 
@@ -236,7 +272,10 @@ fn test_empty_frontmatter() {
 
 #[test]
 fn test_malformed_frontmatter() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -252,7 +291,10 @@ fn test_malformed_frontmatter() {
 
 #[test]
 fn test_multiline_yaml_tags() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -267,7 +309,10 @@ fn test_multiline_yaml_tags() {
 
 #[test]
 fn test_full_text_search() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     // DEFAULT_HEAD_LINES is 10 in main.rs
     const DEFAULT_HEAD_LINES: usize = 10;
@@ -294,7 +339,10 @@ fn test_full_text_search() {
 
 #[test]
 fn test_skip_target_directory() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     // Create target directory
     fs::create_dir(temp_dir.path().join("target")).unwrap();
@@ -315,18 +363,13 @@ fn test_skip_target_directory() {
 
 #[test]
 fn test_filter_by_author_yaml() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
-    create_test_file(
-        &temp_dir,
-        "alice.md",
-        "---\nauthor: Alice\n---\n# Content",
-    );
-    create_test_file(
-        &temp_dir,
-        "bob.md",
-        "---\nauthor: Bob\n---\n# Content",
-    );
+    create_test_file(&temp_dir, "alice.md", "---\nauthor: Alice\n---\n# Content");
+    create_test_file(&temp_dir, "bob.md", "---\nauthor: Bob\n---\n# Content");
     create_test_file(&temp_dir, "none.md", "# Content without author");
 
     let output = run_fmd(&["--author", "alice"], &temp_dir);
@@ -338,9 +381,16 @@ fn test_filter_by_author_yaml() {
 
 #[test]
 fn test_filter_by_author_inline() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
-    create_test_file(&temp_dir, "has_author.md", "# Title\nauthor: Charlie\n\nContent");
+    create_test_file(
+        &temp_dir,
+        "has_author.md",
+        "# Title\nauthor: Charlie\n\nContent",
+    );
     create_test_file(&temp_dir, "no_author.md", "# Title\n\nJust content");
 
     let output = run_fmd(&["--author", "charlie"], &temp_dir);
@@ -351,18 +401,13 @@ fn test_filter_by_author_inline() {
 
 #[test]
 fn test_filter_by_multiple_authors() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
-    create_test_file(
-        &temp_dir,
-        "alice.md",
-        "---\nauthor: Alice\n---\n# Content",
-    );
-    create_test_file(
-        &temp_dir,
-        "bob.md",
-        "---\nauthor: Bob\n---\n# Content",
-    );
+    create_test_file(&temp_dir, "alice.md", "---\nauthor: Alice\n---\n# Content");
+    create_test_file(&temp_dir, "bob.md", "---\nauthor: Bob\n---\n# Content");
     create_test_file(
         &temp_dir,
         "charlie.md",
@@ -380,7 +425,10 @@ fn test_filter_by_multiple_authors() {
 
 #[test]
 fn test_depth_limit() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "root.md", "# Root");
 
@@ -403,7 +451,10 @@ fn test_depth_limit() {
 
 #[test]
 fn test_depth_one() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "root.md", "# Root");
 
@@ -422,7 +473,10 @@ fn test_depth_one() {
 
 #[test]
 fn test_combined_tag_and_author() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -449,7 +503,10 @@ fn test_combined_tag_and_author() {
 
 #[test]
 fn test_combined_title_field_date() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -463,7 +520,14 @@ fn test_combined_title_field_date() {
     );
 
     let output = run_fmd(
-        &["--title", "rust", "--field", "status:active", "--date-after", "2024-01-01"],
+        &[
+            "--title",
+            "rust",
+            "--field",
+            "status:active",
+            "--date-after",
+            "2024-01-01",
+        ],
         &temp_dir,
     );
 
@@ -475,7 +539,10 @@ fn test_combined_title_field_date() {
 
 #[test]
 fn test_custom_glob_markdown_extension() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "file.md", "# Content");
     create_test_file(&temp_dir, "file.markdown", "# Content");
@@ -490,7 +557,10 @@ fn test_custom_glob_markdown_extension() {
 
 #[test]
 fn test_custom_glob_specific_directory() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "root.md", "# Root");
 
@@ -528,13 +598,12 @@ fn test_nonexistent_directory() {
 
 #[test]
 fn test_full_text_tag_search() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
-    create_test_file(
-        &temp_dir,
-        "early.md",
-        "---\ntags: [rust]\n---\n# Content",
-    );
+    create_test_file(&temp_dir, "early.md", "---\ntags: [rust]\n---\n# Content");
     create_test_file(
         &temp_dir,
         "late.md",
@@ -555,7 +624,10 @@ fn test_full_text_tag_search() {
 
 #[test]
 fn test_unicode_content() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(
         &temp_dir,
@@ -572,7 +644,10 @@ fn test_unicode_content() {
 
 #[test]
 fn test_special_chars_in_filename() {
-    let temp_dir = tempfile::Builder::new().prefix("test_").tempdir_in(".").unwrap();
+    let temp_dir = tempfile::Builder::new()
+        .prefix("test_")
+        .tempdir_in(".")
+        .unwrap();
 
     create_test_file(&temp_dir, "file[1].md", "# Content");
     create_test_file(&temp_dir, "file (2).md", "# Content");

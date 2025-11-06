@@ -190,7 +190,8 @@ fn test_extract_frontmatter_date_field() {
 
 #[test]
 fn test_extract_frontmatter_multiple_date_fields() {
-    let content = "---\ndate: 2024-01-15\ncreated: 2024-01-01\nmodified: 2024-01-20\n---\n# Content";
+    let content =
+        "---\ndate: 2024-01-15\ncreated: 2024-01-01\nmodified: 2024-01-20\n---\n# Content";
     let path = PathBuf::from("test.md");
     let fm = extract_frontmatter(content, &path);
 
