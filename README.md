@@ -11,6 +11,8 @@ fmd --tag work --tag urgent   # Find notes with work OR urgent tags
 fmd --field "author:John"     # Find notes by John
 ```
 
+[![CI](https://github.com/zhouer/fmd/workflows/CI/badge.svg)](https://github.com/zhouer/fmd/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/zhouer/fmd/branch/master/graph/badge.svg)](https://codecov.io/gh/zhouer/fmd)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg)](https://www.rust-lang.org/)
 
