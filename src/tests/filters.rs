@@ -6,6 +6,7 @@ fn test_compiled_filters_tag_regex() {
     let args = Args {
         tags: vec!["rust".to_string(), "python".to_string()],
         titles: vec![],
+        authors: vec![],
         names: vec![],
         fields: vec![],
         nul: false,
@@ -36,6 +37,7 @@ fn test_compiled_filters_invalid_regex_returns_error() {
     let args = Args {
         tags: vec![],
         titles: vec![],
+        authors: vec![],
         names: vec!["[invalid".to_string()], // Invalid regex
         fields: vec![],
         nul: false,
@@ -59,6 +61,7 @@ fn test_compiled_filters_empty_field_name() {
     let args = Args {
         tags: vec![],
         titles: vec![],
+        authors: vec![],
         names: vec![],
         fields: vec![":pattern".to_string()], // Empty field name
         nul: false,
@@ -85,6 +88,7 @@ fn test_compiled_filters_empty_pattern() {
     let args = Args {
         tags: vec![],
         titles: vec![],
+        authors: vec![],
         names: vec![],
         fields: vec!["field:".to_string()], // Empty pattern
         nul: false,
@@ -111,6 +115,7 @@ fn test_compiled_filters_empty_field_and_pattern() {
     let args = Args {
         tags: vec![],
         titles: vec![],
+        authors: vec![],
         names: vec![],
         fields: vec![":".to_string()], // Both empty
         nul: false,
@@ -139,6 +144,7 @@ fn test_compiled_filters_whitespace_only_field() {
     let args = Args {
         tags: vec![],
         titles: vec![],
+        authors: vec![],
         names: vec![],
         fields: vec!["  :pattern".to_string()], // Whitespace-only field
         nul: false,

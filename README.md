@@ -8,7 +8,7 @@ Search Markdown files by tags, frontmatter, and custom fields. Built for note-ta
 fmd --tag python              # Find all notes tagged with python
 fmd --title "meeting"         # Find notes with "meeting" in title
 fmd --tag work --tag urgent   # Find notes with work OR urgent tags
-fmd --field "author:John"     # Find notes by John
+fmd --author "John"           # Find notes by John
 ```
 
 [![CI](https://github.com/zhouer/fmd/workflows/CI/badge.svg)](https://github.com/zhouer/fmd/actions/workflows/ci.yml)
@@ -54,6 +54,10 @@ fmd -t linux -t macos        # OR logic: linux OR macos
 fmd --title "meeting notes"
 fmd -T "project.*2025"       # Regex supported
 
+# Find by author
+fmd --author "John"
+fmd -a "Jane" -a "Bob"       # OR logic: Jane OR Bob
+
 # Find by filename
 fmd --name "2025-01"         # Files with "2025-01" in name
 fmd -i -n readme             # Case-insensitive
@@ -68,7 +72,7 @@ fmd --date-before 2025-12-31          # Files dated before Dec 31, 2025
 fmd --date-after 2025-01-01 --date-before 2025-03-31  # Q1 2025
 
 # Combine filters (AND logic across types)
-fmd -t work -T "meeting" -f "author:John"
+fmd -t work -T "meeting" -a "John"
 # → (tag=work) AND (title=meeting) AND (author=John)
 
 # Search entire file content (not just first 10 lines)
@@ -156,12 +160,26 @@ fmd -n "2025-01"
 fmd -i -n readme
 ```
 
+### Search by Author
+
+```bash
+# Single author
+fmd --author "John"
+fmd -a "John Doe"
+
+# Multiple authors (OR logic)
+fmd -a "John" -a "Jane"      # John OR Jane
+
+# Case-insensitive matching
+fmd -a "john doe"            # Matches "John Doe"
+
+# Partial matching
+fmd -a "Doe"                 # Matches "John Doe", "Jane Doe", etc.
+```
+
 ### Search by Custom Fields
 
 ```bash
-# By author
-fmd -f "author:John"
-
 # By status
 fmd -f "status:draft"
 
@@ -207,7 +225,7 @@ Filters of **different types** use **AND** logic:
 fmd -t work -T meeting
 
 # Tag AND author AND status
-fmd -t project -f "author:John" -f "status:active"
+fmd -t project -a "John" -f "status:active"
 ```
 
 Filters of the **same type** use **OR** logic:
@@ -217,7 +235,7 @@ Filters of the **same type** use **OR** logic:
 fmd -t python -t rust
 
 # author=John OR author=Jane
-fmd -f "author:John" -f "author:Jane"
+fmd -a "John" -a "Jane"
 ```
 
 ### Compose with Unix Tools
@@ -253,6 +271,7 @@ fmd -t archive | xargs tar -czf archive.tar.gz
 | `-d, --depth N` | Limit search depth (1=current dir only) |
 | `-t, --tag TAG` | Filter by tag (case-insensitive) |
 | `-T, --title PAT` | Filter by title (case-insensitive, regex) |
+| `-a, --author PAT` | Filter by author (case-insensitive) |
 | `-n, --name PAT` | Filter by filename (regex) |
 | `-f, --field F:P` | Filter by frontmatter field (format: `field:pattern`) |
 | `--date-after DATE` | Filter files with dates on or after DATE (format: YYYY-MM-DD) |
@@ -271,7 +290,7 @@ fmd -t archive | xargs tar -czf archive.tar.gz
 
 ```bash
 fmd -t A -t B              # A OR B
-fmd -f author:X -f author:Y # X OR Y
+fmd -a X -a Y              # X OR Y
 ```
 
 ### Different Types → AND
@@ -285,7 +304,7 @@ fmd -t A -f status:draft   # A AND draft
 
 ```bash
 # (tag=work OR tag=personal) AND title=meeting AND author=John
-fmd -t work -t personal -T meeting -f "author:John"
+fmd -t work -t personal -T meeting -a "John"
 ```
 
 ---

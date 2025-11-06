@@ -87,6 +87,10 @@ struct Args {
     #[arg(short = 'T', long = "title")]
     titles: Vec<String>,
 
+    /// Filter by author (can be specified multiple times, OR logic)
+    #[arg(short = 'a', long = "author")]
+    authors: Vec<String>,
+
     /// Filter by filename (can be specified multiple times, OR logic)
     #[arg(short = 'n', long = "name")]
     names: Vec<String>,
@@ -132,6 +136,9 @@ struct CompiledFilters {
     /// Pre-lowercased title patterns for case-insensitive matching
     title_patterns: Vec<String>,
 
+    /// Pre-lowercased author patterns for case-insensitive matching
+    author_patterns: Vec<String>,
+
     /// Pre-compiled regex patterns for filename matching
     name_patterns: Vec<Regex>,
 
@@ -165,6 +172,9 @@ impl CompiledFilters {
 
         // Pre-lowercase title patterns
         let title_patterns = args.titles.iter().map(|t| t.to_lowercase()).collect();
+
+        // Pre-lowercase author patterns
+        let author_patterns = args.authors.iter().map(|a| a.to_lowercase()).collect();
 
         // Compile filename regex patterns
         let mut name_patterns = Vec::new();
@@ -242,6 +252,7 @@ impl CompiledFilters {
         Ok(CompiledFilters {
             tag_patterns,
             title_patterns,
+            author_patterns,
             name_patterns,
             field_patterns,
             date_after,
@@ -254,6 +265,9 @@ impl CompiledFilters {
 struct Frontmatter {
     #[serde(default)]
     title: Option<String>,
+
+    #[serde(default)]
+    author: Option<String>,
 
     #[serde(default)]
     tags: Option<TagValue>,
@@ -376,6 +390,33 @@ impl Metadata {
                 let after = &trimmed[hashes..];
                 if after.starts_with(' ') && after.to_lowercase().contains(pattern_lower) {
                     return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn has_author(&self, pattern_lower: &str) -> bool {
+        // Check YAML frontmatter author
+        if let Some(ref fm) = self.frontmatter {
+            if let Some(ref author) = fm.author {
+                if author.to_lowercase().contains(pattern_lower) {
+                    return true;
+                }
+            }
+        }
+
+        // Check inline format (author: value)
+        for line in self.raw_content.lines() {
+            let trimmed = line.trim_start();
+            if let Some(colon_pos) = trimmed.find(':') {
+                let key = &trimmed[..colon_pos];
+                if key.eq_ignore_ascii_case("author") {
+                    let value = &trimmed[colon_pos + 1..];
+                    if value.to_lowercase().contains(pattern_lower) {
+                        return true;
+                    }
                 }
             }
         }
@@ -605,6 +646,17 @@ fn should_include_file_by_content(metadata: &Metadata, filters: &CompiledFilters
         }
     }
 
+    // Check author filters (OR logic: match any author)
+    if !filters.author_patterns.is_empty() {
+        let author_matched = filters
+            .author_patterns
+            .iter()
+            .any(|pattern| metadata.has_author(pattern));
+        if !author_matched {
+            return false;
+        }
+    }
+
     // Check field filters
     if !filters.field_patterns.is_empty() {
         let field_matched = filters
@@ -713,6 +765,7 @@ fn find_matching_files(args: &Args) -> Result<Vec<PathBuf>> {
     // If no filters, return all files sorted
     if args.tags.is_empty()
         && args.titles.is_empty()
+        && args.authors.is_empty()
         && args.names.is_empty()
         && args.fields.is_empty()
         && args.date_after.is_none()

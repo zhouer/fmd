@@ -137,6 +137,7 @@ fn test_date_filter_args_parsing() {
     let args = Args {
         tags: vec![],
         titles: vec![],
+        authors: vec![],
         names: vec![],
         fields: vec![],
         nul: false,
@@ -167,6 +168,7 @@ fn test_date_filter_invalid_format() {
     let args = Args {
         tags: vec![],
         titles: vec![],
+        authors: vec![],
         names: vec![],
         fields: vec![],
         nul: false,
