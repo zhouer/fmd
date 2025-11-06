@@ -216,28 +216,6 @@ fmd -t work --date-after 2025-01-01  # Work notes from 2025
 
 **Date format:** `YYYY-MM-DD` (ISO 8601)
 
-### Combine Filters
-
-Filters of **different types** use **AND** logic:
-
-```bash
-# Tag AND title
-fmd -t work -T meeting
-
-# Tag AND author AND status
-fmd -t project -a "John" -f "status:active"
-```
-
-Filters of the **same type** use **OR** logic:
-
-```bash
-# tag=python OR tag=rust
-fmd -t python -t rust
-
-# author=John OR author=Jane
-fmd -a "John" -a "Jane"
-```
-
 ### Compose with Unix Tools
 
 ```bash
