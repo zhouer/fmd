@@ -69,8 +69,8 @@ fn yaml_value_number_types() {
             vec![("42", true), ("4", true), ("2", true), ("43", false)],
         ),
         (
-            Value::Number(serde_yaml::Number::from(3.14f64)),
-            vec![("3.14", true), ("3", true), ("14", true), ("15", false)],
+            Value::Number(serde_yaml::Number::from(3.5f64)),
+            vec![("3.5", true), ("3", true), ("5", true), ("15", false)],
         ),
         (
             Value::Number(serde_yaml::Number::from(-100)),

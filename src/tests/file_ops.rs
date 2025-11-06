@@ -183,7 +183,7 @@ fn test_read_file_content_with_special_chars() {
 fn test_read_file_content_whitespace_lines() {
     let mut temp_file = NamedTempFile::new().unwrap();
     writeln!(temp_file, "Line 1").unwrap();
-    writeln!(temp_file, "").unwrap();
+    writeln!(temp_file).unwrap();
     writeln!(temp_file, "   ").unwrap();
     writeln!(temp_file, "Line 4").unwrap();
     temp_file.flush().unwrap();
@@ -251,8 +251,8 @@ fn test_read_file_content_markdown_formatting() {
 fn test_read_file_content_consecutive_newlines() {
     let mut temp_file = NamedTempFile::new().unwrap();
     writeln!(temp_file, "Line 1").unwrap();
-    writeln!(temp_file, "").unwrap();
-    writeln!(temp_file, "").unwrap();
+    writeln!(temp_file).unwrap();
+    writeln!(temp_file).unwrap();
     writeln!(temp_file, "Line 4").unwrap();
     temp_file.flush().unwrap();
 
