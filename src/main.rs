@@ -64,7 +64,7 @@ const EXCLUDED_DIRS: &[&str] = &[
 
 /// fmd — Find Markdown files by metadata
 #[derive(Parser, Debug)]
-#[command(name = "fmd")]
+#[command(name = "fmd", version)]
 #[command(about = "Find Markdown files by metadata - Search by tags, frontmatter, and custom fields", long_about = None)]
 struct Args {
     /// Directories to search (default: current directory)
